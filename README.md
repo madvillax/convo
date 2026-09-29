@@ -1,4 +1,4 @@
-# KNOW
+# CONVO 
 
 A terminal knowledge assistant that will answer questions about selected local files with path and line citations. This repository currently contains the Bun CLI scaffold and the directories for the backend you will build.
 
