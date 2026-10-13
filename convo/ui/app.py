@@ -8,8 +8,14 @@ from textual.containers import VerticalScroll
 from textual.widgets import Input, Static
 
 from convo import __version__
-from convo.backend.domain.contracts import Backend, Document, Message
-from convo.backend.domain.errors import BackendNotConnected
+from convo.chat.sessions import ChatSession
+from convo.core.contracts import (
+    AccountControls,
+    Backend,
+    Document,
+    Message,
+)
+from convo.core.exceptions import BackendNotConnected
 from convo.ui.files import FilePicker
 
 
@@ -22,9 +28,16 @@ class ConvoApp(App[None]):
         super().__init__()
         self.directory = directory.resolve()
         self.backend = backend
-        self.document: Document | None = None
-        self.history: tuple[Message, ...] = ()
+        self.session = ChatSession()
         self.busy = False
+
+    @property
+    def document(self) -> Document | None:
+        return self.session.document
+
+    @property
+    def history(self) -> tuple[Message, ...]:
+        return self.session.history
 
     def compose(self) -> ComposeResult:
         yield Static(
@@ -52,7 +65,7 @@ class ConvoApp(App[None]):
         state = detail or (
             "ready" if self.document and self.document.indexed else "backend pending"
         )
-        self.query_one("#status", Static).update(f"hermes · qwen3 embeddings · {file} · {state}")
+        self.query_one("#status", Static).update(f"ChatGPT · qwen3 embeddings · {file} · {state}")
 
     async def append_message(self, role: str, text: str) -> None:
         welcome = self.query("#welcome")
@@ -84,13 +97,12 @@ class ConvoApp(App[None]):
     async def prepare_file(self, path: Path) -> None:
         try:
             document = await self.backend.prepare(path)
-            self.document = document
-            self.history = ()
+            self.session.select_document(document)
             await self.query_one("#conversation", VerticalScroll).remove_children()
             suffix = (
                 "Ask a question to begin."
                 if document.indexed
-                else "Backend pending — follow backend.md to connect Hermes."
+                else "Backend pending — follow backend.md to connect a model provider."
             )
             await self.append_message("file", f"{path.name}\n{suffix}")
         except Exception:  # noqa: BLE001 - isolate errors from the user-supplied backend
@@ -106,15 +118,13 @@ class ConvoApp(App[None]):
             return
         event.input.value = ""
         if text.startswith("/"):
-            command = text.lower()
-            if command == "/file":
+            command = text.lower().split()
+            if command == ["/file"]:
                 self.action_file()
-            elif command in {"/quit", "/exit"}:
+            elif command in (["/quit"], ["/exit"]):
                 self.exit()
-            elif command in {"/clear", "/reset"}:
-                self.history = ()
-                if command == "/reset":
-                    self.document = None
+            elif command in (["/clear"], ["/reset"]):
+                self.session.clear(keep_document=command != ["/reset"])
                 await self.query_one("#conversation", VerticalScroll).remove_children()
                 await self.append_message(
                     "convo",
@@ -123,10 +133,19 @@ class ConvoApp(App[None]):
                     else "Type /file to choose a document.",
                 )
                 self.update_status()
-            elif command == "/help":
+            elif command == ["/login"]:
+                if isinstance(self.backend, AccountControls):
+                    self.set_busy(True, "waiting for ChatGPT sign-in…")
+                    self.login_openai()
+                else:
+                    await self.append_message(
+                        "convo",
+                        "ChatGPT sign-in is not wired yet. Follow backend.md to add /login.",
+                    )
+            elif command == ["/help"]:
                 await self.append_message(
                     "commands",
-                    "/file   choose a file\n/clear  clear conversation, keep file\n/reset  clear conversation and file\n/quit   exit\n\nPicker: type to filter, ↑/↓ to move, Enter to select, Esc to close.",
+                    "/file   choose a file\n/login  connect your ChatGPT account\n/clear  clear conversation, keep file\n/reset  clear conversation and file\n/quit   exit\n\nPicker: type to filter, ↑/↓ to move, Enter to select, Esc to close.",
                 )
             else:
                 await self.append_message("convo", "Unknown command. Type /help for commands.")
@@ -142,7 +161,7 @@ class ConvoApp(App[None]):
         try:
             assert self.document is not None
             answer = await self.backend.answer(self.document, question, self.history)
-            await self.append_message("hermes", answer.text)
+            await self.append_message("chatgpt", answer.text)
             if answer.sources:
                 await self.append_message(
                     "sources",
@@ -151,13 +170,28 @@ class ConvoApp(App[None]):
                         for i, source in enumerate(answer.sources, 1)
                     ),
                 )
-            self.history += (Message("user", question), Message("assistant", answer.text))
+            self.session.record_turn(question, answer.text)
         except BackendNotConnected as error:
             await self.append_message("convo", str(error))
         except Exception:  # noqa: BLE001 - isolate errors from the user-supplied backend
             # Avoid rendering raw provider errors which may include credentials.
             await self.append_message(
                 "error", "Could not get an answer. Check your backend configuration and try again."
+            )
+        finally:
+            self.set_busy(False)
+
+    @work(group="backend", exclusive=True)
+    async def login_openai(self) -> None:
+        assert isinstance(self.backend, AccountControls)
+        try:
+            account = await self.backend.login_openai()
+            await self.append_message("convo", f"Connected ChatGPT account: {account}")
+        except BackendNotConnected as error:
+            await self.append_message("convo", str(error))
+        except Exception:  # noqa: BLE001 - never render tokens or raw provider errors
+            await self.append_message(
+                "error", "ChatGPT sign-in failed. Check the backend log and retry /login."
             )
         finally:
             self.set_busy(False)

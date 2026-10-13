@@ -2,8 +2,8 @@ import asyncio
 
 from textual.widgets import Input, OptionList, Static
 
-from convo.backend.domain.contracts import Answer, Document, Source
-from convo.backend.services.shell import ShellBackend
+from convo.chat.shell import ShellBackend
+from convo.core.contracts import Answer, Document, Source
 from convo.ui.app import ConvoApp
 from convo.ui.files import FilePicker
 
@@ -53,6 +53,21 @@ class TestBackend:
         if question == "fail":
             raise RuntimeError("secret-token")
         return Answer("The answer is here [1].", (Source("notes.md · lines 1–2", "A fact"),))
+
+
+class AccountBackend(TestBackend):
+    async def login_openai(self):
+        return "reader@example.com"
+
+
+async def test_login_command(tmp_path):
+    backend = AccountBackend()
+    app = ConvoApp(tmp_path, backend)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await submit(app, pilot, "/login")
+        await app.workers.wait_for_complete()
+        assert "reader@example.com" in str(list(app.query(".message"))[-1].render())
+        assert not app.busy
 
 
 async def test_backend_boundary_switch_clear_and_error(tmp_path):

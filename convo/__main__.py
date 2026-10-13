@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from convo.backend.services.shell import ShellBackend
+from convo.chat.shell import ShellBackend
 from convo.ui.app import ConvoApp
 
 
