@@ -1,0 +1,26 @@
+Screen {
+    background: #080808;
+    color: #dddddd;
+    padding: 2 3 1 3;
+}
+#brand { height: 1; margin-bottom: 1; }
+#directory { height: 1; color: #555555; }
+#conversation { height: 1fr; margin: 2 0 1 0; scrollbar-size: 1 1; scrollbar-color: #333333; scrollbar-background: #080808; }
+#welcome { color: #777777; height: auto; }
+.message { height: auto; margin-bottom: 2; }
+#prompt { height: 3; border: solid #555555; background: #080808; padding: 0 1; }
+#prompt:focus { border: solid #aaaaaa; }
+#prompt:disabled { opacity: 60%; }
+Input { color: #eeeeee; }
+Input > .input--placeholder { color: #666666; }
+#status { height: 1; margin-top: 1; color: #888888; }
+#keys { height: 1; color: #555555; margin-top: 1; }
+FilePicker { align: center middle; background: #000000 75%; padding: 1; }
+#picker { width: 80; max-width: 100%; height: 24; max-height: 100%; background: #0c0c0c; border: solid #777777; padding: 1 2; }
+#picker-title { height: 1; text-style: bold; margin-bottom: 1; }
+#picker-path { height: 1; color: #666666; margin-bottom: 1; }
+#file-search { height: 3; border: solid #444444; background: #0c0c0c; }
+#file-search:focus { border: solid #888888; }
+#file-options { height: 1fr; border: none; background: #0c0c0c; padding: 0; margin-top: 1; scrollbar-size: 1 1; }
+#file-options > .option-list--option-highlighted { background: #242424; color: #ffffff; text-style: none; }
+#picker-help { height: 1; color: #777777; margin-top: 1; }
