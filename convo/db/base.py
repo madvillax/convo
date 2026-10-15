@@ -1,5 +1,3 @@
-"""SQLAlchemy metadata shared by ORM models and Alembic."""
-
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 

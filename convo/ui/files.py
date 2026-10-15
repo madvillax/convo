@@ -6,6 +6,7 @@ from typing import ClassVar
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import Input, OptionList, Static
 from textual.widgets.option_list import Option
@@ -66,6 +67,7 @@ class FilePicker(ModalScreen[Path | None]):
             options.add_option(Option("Cannot read this directory", disabled=True))
 
     def on_input_changed(self, event: Input.Changed) -> None:
+        event.stop()
         self.refresh_entries(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -74,17 +76,23 @@ class FilePicker(ModalScreen[Path | None]):
         if options.highlighted is not None and self.entries:
             self.choose(options.highlighted)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         if self.query_one("#file-search", Input).has_focus and event.key in {"down", "up"}:
             options = self.query_one("#file-options", OptionList)
-            options.focus()
+            if event.key == "down":
+                options.action_cursor_down()
+            else:
+                options.action_cursor_up()
             event.stop()
             event.prevent_default()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
         self.choose(event.option_index)
 
     def choose(self, index: int) -> None:
+        if not 0 <= index < len(self.entries):
+            return
         path = self.entries[index].resolve()
         if not path.is_relative_to(self.root):
             return

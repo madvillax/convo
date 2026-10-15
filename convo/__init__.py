@@ -1,3 +1,3 @@
-"""Convo's terminal shell. The RAG implementation belongs in backend/."""
+"""A local terminal RAG assistant for chatting with selected files."""
 
 __version__ = "0.1.0"

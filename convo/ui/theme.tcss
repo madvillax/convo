@@ -13,14 +13,26 @@ Screen {
 #prompt:disabled { opacity: 60%; }
 Input { color: #eeeeee; }
 Input > .input--placeholder { color: #666666; }
-#status { height: 1; margin-top: 1; color: #888888; }
-#keys { height: 1; color: #555555; margin-top: 1; }
-FilePicker { align: center middle; background: #000000 75%; padding: 1; }
-#picker { width: 80; max-width: 100%; height: 24; max-height: 100%; background: #0c0c0c; border: solid #777777; padding: 1 2; }
-#picker-title { height: 1; text-style: bold; margin-bottom: 1; }
-#picker-path { height: 1; color: #666666; margin-bottom: 1; }
-#file-search { height: 3; border: solid #444444; background: #0c0c0c; }
-#file-search:focus { border: solid #888888; }
-#file-options { height: 1fr; border: none; background: #0c0c0c; padding: 0; margin-top: 1; scrollbar-size: 1 1; }
-#file-options > .option-list--option-highlighted { background: #242424; color: #ffffff; text-style: none; }
-#picker-help { height: 1; color: #777777; margin-top: 1; }
+#settings { height: 1; margin-top: 1; }
+#selection { height: 1; width: 1fr; min-width: 0; color: #bbbbbb; }
+#thinking { height: 1; width: auto; margin-left: 2; color: #bbbbbb; }
+#status { height: 1; color: #888888; }
+#keys { height: auto; color: #555555; margin-top: 1; }
+#command-menu { display: none; border: solid #333333; background: #0c0c0c; padding: 0; margin-bottom: 1; scrollbar-size: 1 1; }
+#command-menu > .option-list--option-highlighted { background: #242424; color: #ffffff; }
+FilePicker, ModelPicker, SessionPicker { align: center middle; background: #000000 75%; padding: 1; }
+#picker, #model-picker, #session-picker { width: 80; max-width: 100%; height: 24; max-height: 100%; background: #0c0c0c; border: solid #777777; padding: 1 2; }
+#picker-title, #model-title, #session-title { height: 1; text-style: bold; margin-bottom: 1; }
+#picker-path, #model-subtitle, #session-subtitle { height: 1; color: #666666; margin-bottom: 1; }
+#file-search, #model-search, #session-search { height: 3; border: solid #444444; background: #0c0c0c; }
+#file-search:focus, #model-search:focus, #session-search:focus { border: solid #888888; }
+#file-options, #model-options, #session-options { height: 1fr; border: none; background: #0c0c0c; padding: 0; margin-top: 1; scrollbar-size: 1 1; }
+#file-options > .option-list--option-highlighted, #model-options > .option-list--option-highlighted, #session-options > .option-list--option-highlighted { background: #242424; color: #ffffff; text-style: none; }
+#picker-help, #model-help, #session-help { height: auto; color: #777777; margin-top: 1; }
+Screen.compact { padding: 1; }
+Screen.compact #brand { margin-bottom: 0; }
+Screen.compact #directory { display: none; }
+Screen.compact #conversation { margin: 1 0 0 0; min-height: 1; }
+Screen.compact #settings { margin-top: 0; }
+Screen.compact #keys { margin-top: 0; }
+Screen.compact #command-menu { margin-bottom: 0; }

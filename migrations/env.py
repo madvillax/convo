@@ -1,7 +1,43 @@
-"""Alembic environment scaffold; implement backend.md step 4 before using Alembic.
+from alembic import context
+from sqlalchemy import create_engine, pool
 
-Load settings and all ORM models, then supply Base.metadata to Alembic.
-Do not create tables or enable extensions from TUI startup.
-"""
+from convo.core.config import load_settings
+from convo.db import models as models
+from convo.db.base import Base
 
-raise RuntimeError("Complete the Alembic environment in backend.md step 4 first")
+config = context.config
+settings = load_settings()
+target_metadata = Base.metadata
+
+
+def run_migrations_offline() -> None:
+    context.configure(
+        url=settings.database_url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    engine = create_engine(settings.database_url, poolclass=pool.NullPool)
+    try:
+        with engine.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+            )
+            with context.begin_transaction():
+                context.run_migrations()
+    finally:
+        engine.dispose()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

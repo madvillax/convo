@@ -1,77 +1,96 @@
 # convo
 
-A minimal Python TUI for chatting with a file: black background, muted text, rectangular input, and a searchable `/file` picker.
+A quiet Python terminal app for chatting with a local file. Qwen3 embeddings and PostgreSQL full-text search retrieve passages together; a local cross-encoder reranks them; your connected ChatGPT account returns a structured answer with supporting quotations.
 
-**The interface works. You implement the RAG backend.** The default shell selects paths and shows a backend-pending message; it does not parse, embed, upload, query PostgreSQL, or call a model yet.
+## Run
 
-## Run the shell
-
-Python 3.11+ is required; Python 3.12 is recommended. Use [uv](https://docs.astral.sh/uv/):
+Use Python 3.12 and [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv sync --python 3.12
-uv run convo
+uv sync --python 3.12 --extra backend
+# On first setup: copy .env.example to .env and configure DATABASE_URL.
+# Start your existing Podman machine and PostgreSQL container:
+podman machine start
+podman start convo-postgres
+uv run --extra backend alembic upgrade head
+uv run --extra backend convo
 ```
 
-Install an editable command to launch from any directory:
+Skip the Podman start commands when the machine/container is already running. See [backend.md](backend.md) for first-time container creation and the architecture guide. The new migration adds full-text indexing and conversation tables; it preserves existing document snapshots and embeddings.
+
+Install/update the command for other directories:
 
 ```sh
-uv tool install --python 3.12 --editable /Users/mohitsharma/Desktop/Projects/convo
+uv tool install --python 3.12 --force --editable '/Users/mohitsharma/Desktop/Projects/convo[backend]'
 cd ~/Documents
 convo
 ```
 
-`convo` browses the directory you launched it from. You can also use `convo --directory ~/Documents`.
+`uv sync` updates the project environment, while `uv tool install` updates the installed tool environment. An existing editable installation of this checkout reads source changes automatically. `--directory ~/Documents` changes the file browser root; settings still come from the checkout's `.env` or your environment.
+
+Optional model download/warmup outside the TUI:
+
+```sh
+uv run --extra backend convo --download-model
+```
+
+This prepares both Qwen3 and `cross-encoder/ms-marco-MiniLM-L6-v2`. Models otherwise load/download on demand in an isolated process. File preparation shows stages and elapsed time; Esc cancels it. Download/native logs stay in `~/.cache/convo/rag-worker.log` (respecting `XDG_CACHE_HOME`). Startup restores account preferences locally without connecting to storage, loading models, or fetching the account catalog.
+
+For a UI preview without services or backend dependencies:
+
+```sh
+uv run convo --shell
+```
 
 ## Use
 
-1. Enter `/file`, then filter by filename.
-2. Use ↑/↓ and Enter to select a file or open a folder; Esc closes the picker.
-3. After implementing the backend, use `/login` to connect an eligible ChatGPT account.
-4. Ask a question. Model answers become available after you implement and connect the backend.
+Type `/` for command suggestions. Filter by typing, use ↑/↓ to move, Tab to complete, Enter to run, and Esc to dismiss.
 
-| Command | Action |
+| Command/key | Action |
 | --- | --- |
-| `/file` or Ctrl+O | Pick another file |
-| `/login` | Connect a ChatGPT account through OpenAI OAuth |
-| `/help` | Show commands |
-| `/clear` | Clear conversation, keep file |
-| `/reset` | Clear conversation and detach file |
-| `/quit` or Ctrl+C | Exit |
+| `/login` | Connect your ChatGPT account through browser sign-in |
+| `/models` | Search and select an account model |
+| `/models <id>` | Select a model directly |
+| Shift+Tab | Cycle auto and the model's known thinking levels |
+| `/file`, Ctrl+O | Select and index a file; create a saved conversation |
+| `/sessions` | Search saved conversations by title, filename, or ID and resume one |
+| `/sessions <uuid>` | Resume a conversation directly |
+| `/new` | Create a new saved conversation, keeping the selected file |
+| `/clear` | Same behavior as `/new`; previous conversations remain saved |
+| `/reset` | Create a new saved conversation without a selected file |
+| Esc during file preparation | Stop preparation and restore the input |
+| `/help` | Show commands and keys |
+| `/quit`, `/exit`, Ctrl+C | Exit |
 
-The login command is wired to the backend contract but shows a backend-pending message until you implement it. The picker offers `.txt`, `.md`, `.pdf`, `.docx`, `.csv`, `.json`, `.py`, `.rst`, and `.log`. It omits hidden entries and symbolic links. Input is single-line; the transcript scrolls vertically. A terminal of at least 50 columns × 18 rows works best.
+Sessions, completed message pairs, displayed source quotes, and structured answers persist in PostgreSQL. Use `/sessions` after restarting. Resuming uses the saved indexed snapshot, so the original file can have moved or disappeared. Use `/file` again to index changed content. A failed request never saves a partial turn. Account tokens remain in the OS keyring; model/thinking preferences remain in the local account profile.
 
-## Build your backend
+Greetings such as `hello` and acknowledgements such as `thank you` receive a short local reply without retrieval or model calls. Mixed greetings and file questions still use retrieval. Specific questions use hybrid search, reciprocal rank fusion, cross-encoder reranking, and weak-match filtering. Broad file overviews sample sections across the snapshot and rerank their order without applying a QA relevance cutoff.
 
-Follow [backend.md](backend.md) in order:
+ChatGPT returns JSON sections containing text and citation objects. Python validates the schema, requires citations on answered sections, checks source IDs and exact supporting quotes, then renders readable Markdown with numbered citations. Only cited quotes appear under sources. An empty evidence set returns an insufficient-evidence response without an LLM call. These checks verify structure and quotations; they do not prove every generated claim is entailed by its quote.
 
-**PostgreSQL → SQLAlchemy models → Alembic migrations → LlamaIndex readers/chunkers → Qwen3 embeddings → pgvector retrieval → ChatGPT OAuth → TUI connection.**
+Supported files: `.txt`, `.md`, `.pdf`, `.docx`, `.csv`, `.json`, `.py`, `.rst`, `.log`. Limits: 10 MB input, 500,000 extracted characters, and 2,000 chunks. LlamaIndex is used only for readers and chunking. The TUI supports terminals down to 50 columns × 18 rows.
 
-The package lives directly in `convo/`. Its top-level packages group the work by responsibility: `core/` defines shared types and settings, `auth/` handles ChatGPT login, `providers/` calls the ChatGPT API, `chat/` owns the active in-memory session and chat flow, `rag/` indexes and searches files, and `db/` owns SQLAlchemy models, sessions, and repositories. `migrations/env.py` deliberately stops until you complete the Alembic setup in the guide.
+## Architecture
 
-The TUI/backend interface is in `convo/core/contracts.py`. Implement file indexing in `rag/index.py`, account sign-in in `auth/chatgpt.py`, and generation in `providers/openai.py`. Connect them in `chat/service.py`, then switch the entry point from `ShellBackend` to `RagBackend`. Keep `chat/shell.py` for UI-only mode and tests. `/login` is the ChatGPT sign-in command. The current chat session and history are in memory and disappear when the app exits; `db/repositories/conversations.py` is a future seam for persistence.
-
-LlamaIndex is used **only for file readers and chunkers**. Your code owns indexing, SQLAlchemy transactions, pgvector queries, prompts, generation and history handling.
-
-Backend dependencies are declared in an optional extra:
-
-```sh
-uv sync --extra backend
+```text
+convo/
+├── core/       settings, shared values and UI/backend contracts
+├── ui/         Textual app, commands, file/model/session pickers
+├── llm/        ChatGPT connection, credentials, catalog and Responses transport
+├── pipeline/   chat flow, routing, ingestion, embeddings, reranking and worker
+├── prompts/    answer instructions, context builder and structured schema
+└── db/         SQLAlchemy models, connections, document/search/session queries
 ```
 
-This includes PyTorch and parser libraries. Qwen weights download only when you load the embedding model. No PostgreSQL instance or model weights have been created by the scaffold.
+[backend.md](backend.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
 
-## Format, lint, type-check, test
-
-Ruff and ty are dev dependencies managed by uv:
+## Checks
 
 ```sh
-uv run ruff format .
-uv run ruff check .
+uv run --extra backend ruff format --check .
+uv run --extra backend ruff check .
 uv run --extra backend ty check
-uv run pytest -q
+uv run --extra backend pytest -q
 ```
 
-The backend scaffold references optional backend packages, so run type checking with the backend extra. Use `uv run --extra backend pytest -q` when adding tests that exercise those packages.
-
-The existing tests check the TUI with injected adapters: filtering, selection, folder navigation, cancellation, pending-backend messaging, sign-in dispatch, sources, history isolation, error recovery and a small terminal. They do not validate a live database, OAuth flow or model inference.
+PostgreSQL integration checks use a disposable database, enabled explicitly with `CONVO_TEST_DATABASE_URL`. `CONVO_TEST_MODELS=1` also exercises real Qwen/reranking models. See the backend guide for these opt-in checks and their prerequisites.
