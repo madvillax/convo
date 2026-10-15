@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+from textual.containers import VerticalScroll
 from textual.widgets import Input, OptionList, Static
 
 from convo.core.contracts import Answer, ChatModel, Document, GenerationSelection, Source
@@ -9,6 +11,7 @@ from convo.ui.commands import COMMANDS, CommandMenu
 from convo.ui.files import FilePicker
 from convo.ui.models import ModelPicker
 from convo.ui.preview import ShellBackend
+from convo.ui.thinking import ThinkingPicker, thinking_key
 
 
 async def submit(app, pilot, value):
@@ -182,9 +185,96 @@ class GenerationBackend(AccountBackend):
         self.selection = GenerationSelection(model, effort, connected=True)
         return self.selection
 
+    async def select_reasoning(self, effort):
+        await self.list_models()
+        model = self.selection.model
+        assert model is not None
+        if effort is not None and effort not in model.reasoning_efforts:
+            raise ValueError("Unsupported thinking level; use /thinking.")
+        self.selection = GenerationSelection(model, effort, connected=True)
+        return self.selection
+
     async def answer(self, document, question, history):
         self.generation_calls.append(self.selection)
         return await super().answer(document, question, history)
+
+
+async def test_thinking_alternative_picker_and_direct_command_preserve_draft(tmp_path):
+    backend = GenerationBackend()
+    await backend.login_openai()
+    await backend.list_models()
+    app = ConvoApp(tmp_path, backend)
+    async with app.run_test(size=(100, 32)) as pilot:
+        prompt = app.query_one("#prompt", Input)
+        prompt.value = "keep my draft"
+        await pilot.press("ctrl+t")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort == "low"
+        assert prompt.value == "keep my draft"
+        assert prompt.has_focus
+        await pilot.press("f2")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert isinstance(app.screen, ThinkingPicker)
+        await pilot.press("down", "down", "enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert app.selection.reasoning_effort == "high"
+        assert prompt.value == "keep my draft"
+        assert prompt.has_focus
+        await pilot.press("f2")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        await pilot.press("up", "escape")
+        assert app.selection.reasoning_effort == "high"
+        assert prompt.value == "keep my draft"
+        await submit(app, pilot, "/thinking auto")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort is None
+        await submit(app, pilot, "/thinking high")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort == "high"
+        await submit(app, pilot, "/thinking max")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort == "high"
+        assert not app.busy and prompt.has_focus
+
+
+async def test_custom_thinking_key_overrides_input_binding_and_compact_picker(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("CONVO_THINKING_KEY", "ctrl+g")
+    backend = GenerationBackend()
+    await backend.login_openai()
+    await backend.list_models()
+    # Ctrl+A normally edits the input. A configured binding must take priority.
+    app = ConvoApp(tmp_path, backend, thinking_shortcut="ctrl+a")
+    async with app.run_test(size=(50, 18)) as pilot:
+        prompt = app.query_one("#prompt", Input)
+        prompt.value = "draft"
+        await pilot.press("ctrl+a")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort == "low"
+        assert "ctrl+a" in str(app.query_one("#keys", Static).render())
+        await pilot.press("ctrl+t")
+        assert app.selection.reasoning_effort == "low"
+        await pilot.press("shift+tab")
+        await app.workers.wait_for_complete()
+        assert app.selection.reasoning_effort == "medium"
+        await pilot.press("f2")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert isinstance(app.screen, ThinkingPicker)
+        assert app.screen.query_one("#thinking-picker").region.bottom <= 18
+        await pilot.press("escape")
+        assert prompt.value == "draft" and prompt.has_focus
+    assert ConvoApp(tmp_path, backend).thinking_shortcut == "ctrl+g"
+
+
+def test_thinking_shortcut_rejects_reserved_keys():
+    for value in ("ctrl+c", "ctrl+o", "enter", "f2", "t", "ctrl+m"):
+        with pytest.raises(ValueError, match="reserved keys"):
+            thinking_key(value)
 
 
 async def test_slash_menu_typing_navigation_completion_and_escape(tmp_path):
@@ -283,8 +373,12 @@ async def test_small_terminal_menu_picker_cancel_and_empty_filter(tmp_path):
         for widget_id in ("prompt", "selection", "status", "keys"):
             region = app.query_one(f"#{widget_id}").region
             assert region.y >= 0
-            assert region.bottom <= 18
+            assert region.height > 0
+            assert region.bottom <= 17  # preserve the screen's bottom padding
         await pilot.resize_terminal(100, 32)
+        await pilot.resize_terminal(80, 24)
+        await pilot.pause()
+        assert app.query_one("#keys", Static).region.bottom <= 23
         await pilot.resize_terminal(50, 18)
         await pilot.pause()
         assert app.query_one("#prompt", Input).region.bottom <= 18
@@ -568,3 +662,50 @@ async def test_new_session_without_file_and_empty_session_picker(tmp_path):
         await app.workers.wait_for_complete()
         assert len(app.history) == 2
         assert app.history[-1].content == "Hello!"
+
+
+async def test_readable_chat_starts_at_question_and_scrolls_without_losing_draft(tmp_path):
+    class LongAnswerBackend(TestBackend):
+        async def answer(self, document, question, history):
+            return Answer(
+                "First answer paragraph.\n\n"
+                + "\n\n".join(
+                    f"**Step {index}**: " + "A detailed explanation. " * 8 for index in range(12)
+                ),
+                (Source("notes.md · lines 1–2", "A supporting quote."),),
+            )
+
+    app = ConvoApp(tmp_path, LongAnswerBackend())
+    async with app.run_test(size=(100, 32)) as pilot:
+        assert app.query_one("#masthead").region.height == 4
+        app.file_chosen(tmp_path / "notes.md")
+        await app.workers.wait_for_complete()
+        await submit(app, pilot, "Explain this document")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        chat = app.query_one("#conversation", VerticalScroll)
+        question = app.query_one(".user-message", Static)
+        assert app.query_one("#masthead").region.height == 1
+        assert chat.content_region.y <= question.region.y < chat.content_region.bottom
+        assert app.query_one(".assistant-message").region.y < chat.content_region.bottom
+        assert app.query_one(".source-message").region.y >= chat.content_region.bottom
+        prompt = app.query_one("#prompt", Input)
+        prompt.value = "unfinished question"
+        before = chat.scroll_y
+        await pilot.press("pagedown")
+        await pilot.pause()
+        assert chat.scroll_y > before
+        await pilot.press("pageup")
+        await pilot.pause()
+        assert chat.scroll_y <= before
+        assert prompt.value == "unfinished question" and prompt.has_focus
+        await pilot.resize_terminal(50, 18)
+        await pilot.pause()
+        assert app.query_one("#keys").region.bottom <= 17
+        assert app.query_one("#thinking").region.bottom <= 17
+        await pilot.resize_terminal(100, 32)
+        await submit(app, pilot, "/new")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert app.query_one("#masthead").region.height == 4
+        assert not app.query(".user-message")

@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 from typing import ClassVar
 
@@ -8,13 +9,15 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Resize
+from textual.geometry import Size
 from textual.widgets import Input, OptionList, Static
 from textual.widgets.option_list import Option
 
 from convo import __version__
 from convo.core.contracts import (
+    REASONING_EFFORTS,
     AccountControls,
     Backend,
     Document,
@@ -22,6 +25,7 @@ from convo.core.contracts import (
     GenerationSelection,
     Message,
     PreparationControls,
+    ReasoningEffort,
     SessionControls,
 )
 from convo.core.exceptions import BackendNotConnected
@@ -30,6 +34,12 @@ from convo.ui.commands import COMMANDS, Command, CommandMenu, matching_commands
 from convo.ui.files import FilePicker
 from convo.ui.models import ModelPicker
 from convo.ui.sessions import SessionPicker
+from convo.ui.thinking import GOLD, ThinkingPicker, thinking_key
+
+WORDMARK = r"""  ___ ___  _ ____   _____
+ / __/ _ \| '_ \ \ / / _ \
+| (_| (_) | | | \ V / (_) |
+ \___\___/|_| |_|\_/ \___/"""
 
 
 class ConvoApp(App[None]):
@@ -43,10 +53,20 @@ class ConvoApp(App[None]):
         Binding("tab", "complete_command", show=False, priority=True),
         Binding("escape", "cancel_or_dismiss", show=False, priority=True),
         Binding("shift+tab", "cycle_thinking", "Thinking", priority=True),
+        Binding("ctrl+t", "cycle_thinking", "Thinking", priority=True, id="thinking-cycle"),
+        Binding("f2", "choose_thinking", "Choose thinking", priority=True),
+        Binding("pageup", "history_up", "Read earlier messages", priority=True),
+        Binding("pagedown", "history_down", "Read later messages", priority=True),
     ]
 
-    def __init__(self, directory: Path, backend: Backend) -> None:
+    def __init__(
+        self, directory: Path, backend: Backend, *, thinking_shortcut: str | None = None
+    ) -> None:
         super().__init__()
+        self.thinking_shortcut = thinking_key(
+            thinking_shortcut or os.environ.get("CONVO_THINKING_KEY", "ctrl+t")
+        )
+        self.set_keymap({"thinking-cycle": self.thinking_shortcut})
         self.directory = directory.resolve()
         self.backend = backend
         self.session = ChatSession()
@@ -55,6 +75,7 @@ class ConvoApp(App[None]):
         self._cancel_prepare = False
         self.selection = GenerationSelection()
         self.command_choices: tuple[Command, ...] = ()
+        self._chat_started = False
 
     @property
     def document(self) -> Document | None:
@@ -65,28 +86,39 @@ class ConvoApp(App[None]):
         return self.session.history
 
     def compose(self) -> ComposeResult:
-        yield Static(
-            Text.assemble(
-                ("convo", "bold white"), (f"  v{__version__} · / for commands", "#777777")
-            ),
-            id="brand",
-        )
-        yield Static(str(self.directory), id="directory", markup=False)
+        with Horizontal(id="masthead"):
+            yield Static(Text(WORDMARK, style=f"bold {GOLD}"), id="brand")
+            with Vertical(id="identity"):
+                yield Static(f"CONVO  /  v{__version__}", id="version")
+                yield Static("Your files. A quiet conversation.", id="tagline")
+                yield Static(
+                    Text(str(self.directory), no_wrap=True, overflow="ellipsis"), id="directory"
+                )
         with VerticalScroll(id="conversation"):
             yield Static(
-                "Your files. A quiet conversation.\n\nType / to start, or /file to choose a document.",
+                Text.assemble(
+                    ("Start a conversation\n\n", "bold #dddddd"),
+                    ("/file", GOLD),
+                    ("      choose a document\n", "#888888"),
+                    ("/sessions", GOLD),
+                    ("  pick up where you left off\n", "#888888"),
+                    ("/login", GOLD),
+                    ("     connect your ChatGPT account", "#888888"),
+                ),
                 id="welcome",
             )
         yield CommandMenu(id="command-menu")
-        yield Input(placeholder="Ask about your file, or type / for commands", id="prompt")
-        with Horizontal(id="settings"):
-            yield Static("", id="selection", markup=False)
-            yield Static("", id="thinking", markup=False)
-        yield Static("", id="status", markup=False)
-        yield Static("enter send · / commands · shift+tab thinking · ctrl+c quit", id="keys")
+        with Vertical(id="composer"):
+            with Vertical(id="input-panel"):
+                yield Input(placeholder="Ask about your file, or / for commands", id="prompt")
+                with Horizontal(id="settings"):
+                    yield Static("", id="selection", markup=False)
+                    yield Static("", id="thinking", markup=False)
+            yield Static("", id="status", markup=False)
+            yield Static("", id="keys")
 
     def on_mount(self) -> None:
-        self.screen.set_class(self.size.width < 70 or self.size.height < 24, "compact")
+        self.sync_layout()
         if isinstance(self.backend, GenerationControls):
             try:
                 self.selection = self.backend.generation_selection()
@@ -98,12 +130,42 @@ class ConvoApp(App[None]):
         # /models, login, or generation; startup must not wait for the network.
 
     def on_resize(self, event: Resize) -> None:
-        self.screen_stack[0].set_class(event.size.width < 70 or event.size.height < 24, "compact")
-        menus = self.query("#command-menu")
+        self.sync_layout(event.size)
+        menus = self.screen_stack[0].query("#command-menu")
         if menus and self.command_choices:
-            menus.first(CommandMenu).styles.height = min(
-                len(self.command_choices) + 2, 8, max(3, event.size.height - 13)
+            menus.first(CommandMenu).styles.height = self.command_menu_height(event.size)
+
+    def sync_layout(self, size: Size | None = None) -> None:
+        size = size or self.size
+        compact = size.width < 70 or size.height < 24
+        main_screen = self.screen_stack[0]
+        main_screen.set_class(compact, "compact")
+        main_screen.set_class(self._chat_started, "chatting")
+        if main_screen.query("#brand"):
+            main_screen.query_one("#brand", Static).update(
+                Text.assemble(("convo", f"bold {GOLD}"), (f"  v{__version__}", "#777777"))
+                if compact or self._chat_started
+                else Text(WORDMARK, style=f"bold {GOLD}")
             )
+            self.update_key_hints(size)
+
+    def command_menu_height(self, size: Size | None = None) -> int:
+        size = size or self.size
+        compact = size.width < 70 or size.height < 24
+        overhead = 9 if compact else 16 if self._chat_started else 21
+        return min(len(self.command_choices) + 2, 8, max(3, size.height - overhead))
+
+    def update_key_hints(self, size: Size | None = None) -> None:
+        size = size or self.size
+        if self.preparing_path is not None and self.busy:
+            hint = "esc cancel file preparation · ctrl+c quit"
+        elif size.width < 70 or size.height < 24:
+            hint = f"enter send · / commands · {self.thinking_shortcut} think"
+        else:
+            hint = f"enter send · / commands · {self.thinking_shortcut} think · f2 levels · ctrl+c quit"
+        self.screen_stack[0].query_one("#keys", Static).update(
+            Text(hint, no_wrap=True, overflow="ellipsis")
+        )
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "cancel_or_dismiss":
@@ -113,13 +175,15 @@ class ConvoApp(App[None]):
                 not self.busy and self.query_one("#command-menu", CommandMenu).display
             )
         menu_actions = {"command_previous", "command_next", "complete_command", "dismiss_commands"}
-        if action in menu_actions or action == "cycle_thinking":
+        if action in menu_actions or action in {"cycle_thinking", "choose_thinking"}:
             if not self.query("#prompt") or len(self.screen_stack) != 1 or self.busy:
                 return False
             if not self.query_one("#prompt", Input).has_focus:
                 return False
             if action in menu_actions:
                 return self.query_one("#command-menu", CommandMenu).display
+        if action in {"history_up", "history_down"}:
+            return len(self.screen_stack) == 1
         return super().check_action(action, parameters)
 
     def update_status(self, detail: str = "") -> None:
@@ -133,9 +197,13 @@ class ConvoApp(App[None]):
         )
         thinking = self.selection.reasoning_effort or "auto"
         self.query_one("#selection", Static).update(
-            Text(f"ChatGPT · {label}", no_wrap=True, overflow="ellipsis")
+            Text.assemble(
+                ("ChatGPT · ", "#888888"), (label, GOLD), no_wrap=True, overflow="ellipsis"
+            )
         )
-        self.query_one("#thinking", Static).update(f"thinking {thinking}")
+        self.query_one("#thinking", Static).update(
+            Text.assemble(("thinking ", "#888888"), (thinking, GOLD))
+        )
         filename = (
             self.preparing_path.name
             if self.preparing_path
@@ -162,16 +230,14 @@ class ConvoApp(App[None]):
             menu.add_option(
                 Option(
                     Text.assemble(
-                        (f"{command.name:<9}", "bold #eeeeee"), (command.description, "#888888")
+                        (f"{command.name:<11}", f"bold {GOLD}"), (command.description, "#888888")
                     ),
                     id=command.name,
                 )
             )
         menu.display = bool(self.command_choices)
         if self.command_choices:
-            menu.styles.height = min(
-                len(self.command_choices) + 2, 8, max(3, self.size.height - 13)
-            )
+            menu.styles.height = self.command_menu_height()
             menu.highlighted = 0
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -223,24 +289,59 @@ class ConvoApp(App[None]):
         welcome = self.query("#welcome")
         if welcome:
             await welcome.first().remove()
-        body = (
-            Group(Text(role, style="bold #999999"), Markdown(text))
-            if role == "chatgpt"
-            else Text.assemble((role + "\n", "bold #999999"), (text, "#dddddd"))
-        )
+        if role in {"you", "chatgpt"} and not self._chat_started:
+            self._chat_started = True
+            self.sync_layout()
+        body: Text | Group
+        if role == "you":
+            body = Text(text, style="#eeeeee")
+            message_class = "user-message"
+        elif role == "chatgpt":
+            body = Group(
+                Text("convo", style=f"bold {GOLD}"),
+                Text(""),
+                Markdown(text, style="#dddddd", code_theme="monokai"),
+            )
+            message_class = "assistant-message"
+        else:
+            message_class = (
+                "source-message"
+                if role == "sources"
+                else "error-message"
+                if role == "error"
+                else "notice-message"
+            )
+            body = Text.assemble(
+                (role + "\n", "bold #e49b85" if role == "error" else f"bold {GOLD}"),
+                (text, "#aaaaaa" if role == "sources" else "#bbbbbb"),
+            )
         chat = self.query_one("#conversation", VerticalScroll)
-        await chat.mount(Static(body, classes="message"))
+        await chat.mount(Static(body, classes=f"message {message_class}"))
         chat.scroll_end(animate=False)
+
+    async def clear_conversation(self) -> None:
+        await self.query_one("#conversation", VerticalScroll).remove_children()
+        self._chat_started = False
+        self.sync_layout()
+
+    def reveal_latest_turn(self) -> None:
+        questions = list(self.query(".user-message"))
+        if questions:
+            # Wait for answer/source layout, then show the question and the
+            # beginning of the answer instead of jumping to its last citation.
+            self.call_after_refresh(questions[-1].scroll_visible, top=True, animate=False)
+
+    def action_history_up(self) -> None:
+        self.query_one("#conversation", VerticalScroll).scroll_page_up(animate=False)
+
+    def action_history_down(self) -> None:
+        self.query_one("#conversation", VerticalScroll).scroll_page_down(animate=False)
 
     def set_busy(self, busy: bool, detail: str = "") -> None:
         self.busy = busy
         prompt = self.query_one("#prompt", Input)
         prompt.disabled = busy
-        self.query_one("#keys", Static).update(
-            "esc cancel file preparation · ctrl+c quit"
-            if self.preparing_path is not None and busy
-            else "enter send · / commands · shift+tab thinking · ctrl+c quit"
-        )
+        self.update_key_hints()
         self.update_command_menu(prompt.value)
         self.update_status(detail)
         if not busy and len(self.screen_stack) == 1:
@@ -270,7 +371,7 @@ class ConvoApp(App[None]):
                 self.session.restore(snapshot)
             else:
                 self.session.select_document(document)
-            await self.query_one("#conversation", VerticalScroll).remove_children()
+            await self.clear_conversation()
             suffix = (
                 "Ask a question to begin." if document.indexed else "Shell preview · file selected."
             )
@@ -354,11 +455,30 @@ class ConvoApp(App[None]):
                         "convo",
                         "Model controls are unavailable in shell preview. Launch Convo without --shell.",
                     )
+            elif command == "/thinking" and len(parts) <= 2:
+                if len(parts) == 1:
+                    self.action_choose_thinking()
+                elif isinstance(self.backend, GenerationControls):
+                    value = parts[1].casefold()
+                    if value == "auto" or value in REASONING_EFFORTS:
+                        self.set_busy(True, "updating thinking…")
+                        self.change_thinking(value)
+                    else:
+                        await self.append_message(
+                            "convo",
+                            "Unknown thinking level. Use /thinking to see this model's choices.",
+                        )
+                else:
+                    self.notify("Thinking controls are unavailable in shell preview.")
             elif command == "/help" and len(parts) == 1:
                 await self.append_message(
                     "commands",
-                    "\n".join(f"{entry.name:<9}{entry.description}" for entry in COMMANDS)
-                    + "\n\nCommands: type /, ↑/↓ to move, Tab to complete, Enter to run, Esc to dismiss.\nModels: /models to choose; Shift+Tab cycles thinking.\nCtrl+O chooses a file; Ctrl+C exits.",
+                    "\n".join(f"{entry.name:<11}{entry.description}" for entry in COMMANDS)
+                    + "\n\nCommands: type /, ↑/↓ to move, Tab to complete, Enter to run, Esc to dismiss."
+                    + f"\nModels: /models to choose; {self.thinking_shortcut} or Shift+Tab cycles thinking."
+                    + "\nF2 or /thinking chooses a level; /thinking high sets one directly."
+                    + "\nPageUp/PageDown scroll the conversation while you type."
+                    + "\nCtrl+O chooses a file; Ctrl+C exits.",
                 )
             else:
                 await self.append_message(
@@ -394,6 +514,7 @@ class ConvoApp(App[None]):
                     ),
                 )
             self.session.record_turn(question, answer.text, answer)
+            self.reveal_latest_turn()
             if isinstance(self.backend, GenerationControls):
                 try:
                     self.selection = self.backend.generation_selection()
@@ -421,7 +542,7 @@ class ConvoApp(App[None]):
             else:
                 self.session.clear(keep_document=keep_document)
             self.query_one("#prompt", Input).value = ""
-            await self.query_one("#conversation", VerticalScroll).remove_children()
+            await self.clear_conversation()
             await self.append_message(
                 "convo",
                 f"New conversation · {document.path.name}"
@@ -466,7 +587,7 @@ class ConvoApp(App[None]):
             snapshot = await self.backend.load_session(session_id)
             self.session.restore(snapshot)
             self.query_one("#prompt", Input).value = ""
-            await self.query_one("#conversation", VerticalScroll).remove_children()
+            await self.clear_conversation()
             await self.append_message("convo", f"Resumed: {snapshot.title}")
             for message in snapshot.history:
                 await self.append_message(
@@ -480,6 +601,7 @@ class ConvoApp(App[None]):
                             for index, source in enumerate(message.sources, 1)
                         ),
                     )
+            self.reveal_latest_turn()
         except BackendNotConnected as error:
             await self.append_message("convo", str(error))
         except Exception:
@@ -496,7 +618,7 @@ class ConvoApp(App[None]):
             account = await self.backend.login_openai()
             await self.append_message(
                 "convo",
-                f"Connected ChatGPT account: {account}\nUse /models to choose a model; Shift+Tab changes thinking.",
+                f"Connected ChatGPT account: {account}\nUse /models to choose a model; /thinking chooses its thinking effort.",
             )
             if isinstance(self.backend, GenerationControls):
                 try:
@@ -565,6 +687,53 @@ class ConvoApp(App[None]):
             return
         self.set_busy(True, "updating thinking…")
         self.cycle_thinking()
+
+    def action_choose_thinking(self) -> None:
+        if not isinstance(self.backend, GenerationControls):
+            self.notify("Thinking controls are unavailable in shell preview.")
+            return
+        self.action_dismiss_commands()
+        self.set_busy(True, "loading thinking levels…")
+        self.load_thinking()
+
+    @work(group="backend", exclusive=True)
+    async def load_thinking(self) -> None:
+        assert isinstance(self.backend, GenerationControls)
+        model = None
+        try:
+            await self.backend.list_models()
+            self.selection = self.backend.generation_selection()
+            model = self.selection.model
+        except BackendNotConnected as error:
+            await self.append_message("convo", str(error))
+        except Exception:
+            await self.append_message("error", "Could not load thinking levels. Retry /thinking.")
+        finally:
+            self.set_busy(False)
+        if model:
+            self.push_screen(
+                ThinkingPicker(model, self.selection.reasoning_effort), self.thinking_chosen
+            )
+
+    def thinking_chosen(self, value: str | None) -> None:
+        if value is not None:
+            self.set_busy(True, "updating thinking…")
+            self.change_thinking(value)
+
+    @work(group="backend", exclusive=True)
+    async def change_thinking(self, value: str) -> None:
+        assert isinstance(self.backend, GenerationControls)
+        effort: ReasoningEffort | None = next(
+            (item for item in REASONING_EFFORTS if item == value), None
+        )
+        try:
+            self.selection = await self.backend.select_reasoning(effort)
+        except (BackendNotConnected, ValueError) as error:
+            await self.append_message("convo", str(error))
+        except Exception:
+            await self.append_message("error", "Could not change thinking. Retry /thinking.")
+        finally:
+            self.set_busy(False)
 
     @work(group="backend", exclusive=True)
     async def cycle_thinking(self) -> None:

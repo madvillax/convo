@@ -270,3 +270,46 @@ A live request through the existing ChatGPT account also succeeded: the model re
 The installed editable CLI was exercised in a real PTY: first draw took 1.08s, 0.64s and 0.66s during concurrent local checks; `/` showed commands and `/quit` exited cleanly. Session-picker and resumed-grounded-answer screenshots were rendered and visually inspected.
 
 The normal Podman VM currently fails to start with `krunkit exited unexpectedly with exit code 2`. Therefore this session could not migrate the existing Podman database. Database/model verification used the already-installed PostgreSQL 14 + pgvector in disposable local clusters, with Alembic creating the same schema. Those clusters were stopped and removed afterward. The application's database configuration remains Podman; run the migration above when that VM/container is available.
+
+## 2026-10-15 — Gold terminal UI and flexible thinking controls
+
+### Interface
+
+Added an ASCII `convo` wordmark in golden yellow (`#e6b85c`). The header groups the title, version, tagline and current directory. On terminals narrower than 70 columns or shorter than 24 rows, the wordmark becomes a single-line title to preserve conversation space.
+
+The composer now groups the selected model and thinking effort above the rectangular input, with the selected values in gold. File/progress status and keyboard hints sit below it. Command suggestions, picker headings, selected rows and focused borders share the same warm accent. Long paths and model names truncate instead of pushing the controls out of view.
+
+Menu height adapts to the space occupied by the header/composer. Resize handling uses the incoming terminal dimensions, fixing a case where shrinking the window could leave the input below the screen. The compact layout keeps the keyboard hint above the bottom padding.
+
+### Thinking controls and approach
+
+- **Ctrl+T** cycles `auto` and the selected model's known thinking levels. **Shift+Tab** remains available.
+- **F2** or **`/thinking`** opens a picker containing only `auto` and the selected account model's levels. Escape cancels without changing the saved choice.
+- **`/thinking high`** selects a level directly; **`/thinking auto`** restores the model default. An unsupported level reports the model's choices and keeps the current preference.
+- **`--thinking-key ctrl+g`** overrides the cycling shortcut. Alternatively, set **`CONVO_THINKING_KEY=ctrl+g`** in `.env`, or export it for shell preview. The flag takes precedence; `/help` and the footer reflect the actual shortcut.
+- Shortcut remapping uses Textual's binding IDs and keymap API, retaining priority over input editing bindings. Essential keys and the fixed F2 picker shortcut are reserved.
+- Cycling and picker selection preserve the input draft and restore focus after completion.
+
+`ui/thinking.py` owns the picker and shortcut validation. The shared generation contract exposes `select_reasoning()`, delegated through `RagBackend` to the existing ChatGPT provider. The provider checks the account catalog before saving through the existing preference store. Startup still restores local settings without fetching models.
+
+### Verification
+
+Ruff format/lint and ty passed. The default suite passed **60 tests**, with **7 optional PostgreSQL/model integration tests skipped**. After the final compact-layout adjustments, all **22 UI/generation tests** passed again. Coverage includes alternate/configured shortcuts, priority over input bindings, direct level selection, unsupported levels, persisted preferences, cancellation, draft/focus preservation, existing model selection, slash-menu navigation and resizing between 100×32, 80×24 and 50×18.
+
+Rendered screenshots were visually inspected for the gold title/model/effort, rectangular composer, command menu, compact layout and thinking picker. These UI checks use a test account catalog; no live ChatGPT request or database migration was required for this change.
+
+## 2026-10-15 — Readable conversation layout
+
+Reworked the transcript and composer using the supplied chat screenshot as a visual reference, retaining Convo's gold palette.
+
+- Questions use a shaded block with a gold left edge, without a repeated role label.
+- Answers have their own gold heading, consistent indentation, paragraph/turn spacing, Markdown formatting and highlighted code.
+- Validated source quotes sit in a quieter separate block, distinct from the answer.
+- The input and model/thinking row share one shaded rectangular panel; model and thinking values now sit below the input.
+- The ASCII title remains on the opening screen. It collapses to a one-line header during conversation and returns when starting a fresh chat or choosing another file.
+- Completed and restored turns scroll to the latest question and answer opening rather than the end of the source list. PageUp/PageDown scroll the transcript without moving focus away from an unfinished draft.
+- Compact terminals use less padding and a shorter composer so answer text remains visible at 50×18. Command-menu sizing accounts for both the opening and chatting layouts.
+
+The implementation stays in `ui/app.py` and `ui/theme.tcss`. The same message rendering path handles live and restored conversations. Existing thinking/model controls, file selection, progress, cancellation and saved sessions continue through their existing handlers.
+
+Verification: Ruff formatting/lint and ty passed; all **18 UI tests passed**. The added interaction test checks long-answer positioning, scrolling with a preserved draft, compact input visibility and restoration of the opening header after `/new`. Existing tests cover saved session restoration, source display, model/thinking changes, command menus and file preparation. Normal and 50×18 screenshots were rendered and visually inspected with a synthetic answer and source quote, without a live model request. Captures: `screenshots/chat.png` and `screenshots/chat-compact.png` (SVG exports included).
