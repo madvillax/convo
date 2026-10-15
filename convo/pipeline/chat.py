@@ -14,6 +14,7 @@ from convo.core.contracts import (
     Document,
     GenerationSelection,
     Message,
+    ReasoningEffort,
     SessionSnapshot,
     SessionSummary,
 )
@@ -118,6 +119,9 @@ class RagBackend:
 
     async def cycle_reasoning(self) -> GenerationSelection:
         return await self.chat.cycle_reasoning()
+
+    async def select_reasoning(self, effort: ReasoningEffort | None) -> GenerationSelection:
+        return await self.chat.select_reasoning(effort)
 
     def close(self) -> None:
         self.documents.close()

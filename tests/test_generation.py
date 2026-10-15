@@ -164,6 +164,29 @@ async def test_selection_persists_and_is_sent_to_generation(tmp_path, monkeypatc
     assert restarted.generation_selection().reasoning_effort is None
 
 
+async def test_direct_reasoning_selection_validates_and_persists(tmp_path, monkeypatch):
+    auth = connected_auth(tmp_path)
+
+    async def catalog(_token):
+        return (ChatModel("alpha", "Alpha", ("low", "high")), ChatModel("fixed", "Fixed"))
+
+    monkeypatch.setattr("convo.llm.client.list_account_models", catalog)
+    provider = ChatGPTProvider(auth)
+    selected = await provider.select_reasoning("high")
+    assert selected.reasoning_effort == "high"
+    restarted = ChatGPTProvider(ChatGPTAuth(auth.credentials, auth.profiles))
+    assert restarted.generation_selection().reasoning_effort == "high"
+    await restarted.list_models()
+    assert restarted.generation_selection() == selected
+    with pytest.raises(ValueError, match="auto, low, high"):
+        await provider.select_reasoning("max")
+    assert provider.generation_selection() == selected
+    await provider.select_model("fixed")
+    with pytest.raises(ValueError, match="supports these thinking levels: auto"):
+        await provider.select_reasoning("low")
+    assert (await provider.select_reasoning(None)).reasoning_effort is None
+
+
 async def test_refresh_retains_model_and_thinking_preferences(tmp_path, monkeypatch):
     auth = connected_auth(tmp_path)
     saved = auth.account_profile()

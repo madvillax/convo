@@ -7,7 +7,14 @@ import time
 import httpx
 from openai import BadRequestError
 
-from convo.core.contracts import Answer, ChatModel, GenerationSelection, Hit, Message
+from convo.core.contracts import (
+    Answer,
+    ChatModel,
+    GenerationSelection,
+    Hit,
+    Message,
+    ReasoningEffort,
+)
 from convo.core.exceptions import BackendNotConnected
 from convo.llm.auth import RESOURCE, ChatGPTAuth
 from convo.llm.models import parse_model_catalog
@@ -108,6 +115,17 @@ class ChatGPTProvider:
             choices.index(current.reasoning_effort) if current.reasoning_effort in choices else 0
         )
         effort = choices[(index + 1) % len(choices)]
+        self.auth.save_generation_preferences(model.id, model.name, effort)
+        return GenerationSelection(model, effort, connected=True)
+
+    async def select_reasoning(self, effort: ReasoningEffort | None) -> GenerationSelection:
+        await self._ensure_catalog()
+        model = self.generation_selection().model
+        if model is None:
+            raise BackendNotConnected("Choose a ChatGPT model with /models first")
+        if effort is not None and effort not in model.reasoning_efforts:
+            supported = ", ".join(("auto", *model.reasoning_efforts))
+            raise ValueError(f"{model.name} supports these thinking levels: {supported}.")
         self.auth.save_generation_preferences(model.id, model.name, effort)
         return GenerationSelection(model, effort, connected=True)
 
