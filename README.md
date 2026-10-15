@@ -6,16 +6,18 @@ It is released under the [MIT License](LICENSE). Contributions are welcome—see
 
 ## Install and start
 
-The supported release install uses [uv](https://docs.astral.sh/uv/):
+The supported release install uses [uv](https://docs.astral.sh/uv/):c
 
 ```sh
 uv tool install convo-cli
 convo
 ```
 
-On first launch, `convo` creates a private settings file at `~/.config/convo/.env`, pulls `pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations before opening the terminal app. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
+On first launch, `convo` creates a private settings file at `~/.config/convo/.env`, pulls `docker.io/pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations before opening the terminal app. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
 
 Local storage needs Docker Desktop or Podman installed. Start Docker Desktop first if you use Docker. On macOS, Convo starts or initializes a Podman machine when Podman is installed. First use downloads Python dependencies, a database image, and—when indexing your first file—the embedding/reranker models.
+
+Older Convo versions may fail on Fedora/Podman with `short-name resolution enforced but cannot prompt without a TTY`. Run `podman pull pgvector/pgvector:pg16` directly in an interactive terminal, select `docker.io/pgvector/pgvector:pg16` if prompted, then retry `convo`. Podman saves that registry choice for later launches. Current source uses the full Docker Hub image name to avoid the prompt, including when the `docker` command is a Podman compatibility wrapper.
 
 If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL, run `convo --setup` once to migrate that database, then run `convo`. Explicit database connections are used as configured; startup only manages storage created by Convo.
 
@@ -98,6 +100,17 @@ convo/
 ```
 
 [ARCHITECTURE.md](ARCHITECTURE.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
+
+## Website workspace
+
+This repository also contains the landing page in [`apps/web`](apps/web/README.md). The Python CLI stays in `convo/`; the website uses a separate Bun workspace.
+
+```sh
+bun install
+bun run dev     # website at http://127.0.0.1:3000
+bun run build   # static output in apps/web/dist
+bun run check   # website checks
+```
 
 ## Checks
 

@@ -10,7 +10,10 @@ from convo.core import config
 from convo.core.config import user_settings_path
 
 
-def test_setup_writes_private_user_settings_and_creates_loopback_container(tmp_path, monkeypatch):
+@pytest.mark.parametrize("runtime", ["docker", "podman"])
+def test_setup_writes_private_user_settings_and_creates_loopback_container(
+    tmp_path, monkeypatch, runtime
+):
     commands: list[list[str]] = []
 
     def fake_run(command, *, allow_failure=False):
@@ -21,7 +24,7 @@ def test_setup_writes_private_user_settings_and_creates_loopback_container(tmp_p
     monkeypatch.setattr(bootstrap, "_run", fake_run)
     monkeypatch.setattr(bootstrap.secrets, "token_urlsafe", lambda _size: "safe-password")
 
-    database_url = bootstrap._ensure_container("podman", None)
+    database_url = bootstrap._ensure_container(runtime, None)
 
     assert database_url == "postgresql+psycopg://convo:safe-password@localhost:5432/convo"
     assert user_settings_path().read_text(encoding="utf-8") == (
@@ -35,6 +38,10 @@ def test_setup_writes_private_user_settings_and_creates_loopback_container(tmp_p
     )
     assert user_settings_path().stat().st_mode & 0o777 == 0o600
     create_command = next(command for command in commands if command[1] == "run")
+    # Both Podman and its Docker-compatible shim must avoid interactive
+    # short-name registry resolution on distributions such as Fedora.
+    assert create_command[0] == runtime
+    assert create_command[-1] == "docker.io/pgvector/pgvector:pg16"
     assert "127.0.0.1:5432:5432" in create_command
     assert "convo-postgres-data:/var/lib/postgresql/data" in create_command
     assert "io.convo.managed=true" in create_command

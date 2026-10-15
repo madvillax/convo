@@ -90,7 +90,7 @@ podman run --name convo-postgres \
   -e POSTGRES_DB=convo \
   -p 127.0.0.1:5432:5432 \
   -v convo-postgres-data:/var/lib/postgresql/data \
-  -d pgvector/pgvector:pg16
+  -d docker.io/pgvector/pgvector:pg16
 ```
 
 For later runs of a manually created container, use `podman start convo-postgres`. The named volume preserves the database across container stops. The example credentials are for local development; set your own values consistently if changed. The default first-run setup generates a random password and saves it in Convo's private user settings file.
