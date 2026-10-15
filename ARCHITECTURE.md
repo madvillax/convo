@@ -75,12 +75,11 @@ The main abstractions are `Backend` for the UI, optional account/model/session c
 ## 2. Install with uv and create local PostgreSQL storage
 
 ```sh
-uv sync --python 3.12 --extra backend
-uv run --extra backend convo --setup
-uv run --extra backend convo
+uv sync --python 3.12
+uv run convo
 ```
 
-`convo --setup` is the supported first-run path for an installed CLI as well. It detects Docker or Podman, starts/initializes a Podman machine on macOS when needed, creates a named `convo-postgres-data` volume, and binds the `convo-postgres` pgvector container only to `127.0.0.1:5432`. It generates a database password and writes the connection string with mode `0600` to `~/.config/convo/.env` (or `$XDG_CONFIG_HOME/convo/.env`). It never deletes, replaces, or resets an existing container or volume.
+Running `convo` automatically prepares local storage before opening the TUI. It detects Docker or Podman, starts/initializes a Podman machine on macOS when needed, creates a named `convo-postgres-data` volume, and binds the `convo-postgres` pgvector container only to `127.0.0.1:5432`. It generates a database password and writes the connection string with mode `0600` to `~/.config/convo/.env` (or `$XDG_CONFIG_HOME/convo/.env`). Later launches restart the managed container and apply pending migrations. Existing containers and volumes are preserved. For an explicit external `DATABASE_URL`, run `convo --setup` to migrate it once; regular startup uses it as configured.
 
 For a development-only manual setup, create the project's database container once:
 
@@ -94,7 +93,7 @@ podman run --name convo-postgres \
   -d pgvector/pgvector:pg16
 ```
 
-For later runs, use `podman start convo-postgres`. The named volume preserves the database across container stops. The example credentials are for local development; set your own values consistently if changed. An installed CLI should use `convo --setup` instead, so it can keep a random password in its private user settings file.
+For later runs of a manually created container, use `podman start convo-postgres`. The named volume preserves the database across container stops. The example credentials are for local development; set your own values consistently if changed. The default first-run setup generates a random password and saves it in Convo's private user settings file.
 
 Configure the project `.env` from `.env.example`:
 
@@ -110,8 +109,8 @@ RETRIEVAL_CANDIDATES=20
 
 ```sh
 podman exec convo-postgres pg_isready -U convo -d convo
-uv run --extra backend alembic upgrade head
-uv run --extra backend alembic check
+uv run alembic upgrade head
+uv run alembic check
 ```
 
 Migration `a42e9d8f0b31` adds the generated full-text column, a GIN index, and conversation tables. Existing text automatically populates the generated column, so existing vector snapshots do not need re-embedding for hybrid retrieval. It follows the existing revisions and preserves document/chunk rows. Its downgrade removes the added conversation/search schema; do not downgrade if you need saved chats.
@@ -267,8 +266,8 @@ File preparation displays filename, current stage, elapsed seconds and Esc cance
 
 ```sh
 # Optional warmup, outside the fullscreen interface:
-uv run --extra backend convo --download-model
-uv run --extra backend convo
+uv run convo --download-model
+uv run convo
 ```
 
 The app restores saved account/model preferences from local metadata without a startup network refresh. `/models`, login and ordinary generation refresh the account catalog when needed. Tokens remain in the OS keyring; account metadata/preferences retain owner-only permissions. The ChatGPT account connection remains separate from database chat sessions.
@@ -278,17 +277,17 @@ The app restores saved account/model preferences from local metadata without a s
 ## 10. Verify implementation
 
 ```sh
-uv run --extra backend ruff format --check .
-uv run --extra backend ruff check .
-uv run --extra backend ty check
-uv run --extra backend pytest -q
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest -q
 ```
 
 The standard suite uses fakes for external services and skips database/model integration tests unless enabled. To test against a running Podman PostgreSQL instance, set an admin connection in `CONVO_TEST_DATABASE_URL`; the fixture creates and drops its own randomly named database. It never migrates or clears the application database:
 
 ```sh
 CONVO_TEST_DATABASE_URL='postgresql+psycopg://convo:convo@localhost:5432/convo' \
-CONVO_TEST_MODELS=1 uv run --extra backend pytest -q
+CONVO_TEST_MODELS=1 uv run pytest -q
 ```
 
 The database role must be able to create databases, and pgvector must be installed on that PostgreSQL server. `CONVO_TEST_MODELS=1` loads/downloads the real Qwen and reranker models. Without it, database/schema/persistence checks still run and the model-heavy checks skip.
@@ -296,7 +295,7 @@ The database role must be able to create databases, and pgvector must be install
 For development machines that already have PostgreSQL `initdb`, `pg_ctl` and pgvector installed, an alternative test-only fixture creates and removes a temporary cluster:
 
 ```sh
-CONVO_TEST_POSTGRES=1 CONVO_TEST_MODELS=1 uv run --extra backend pytest -q
+CONVO_TEST_POSTGRES=1 CONVO_TEST_MODELS=1 uv run pytest -q
 ```
 
 Coverage includes preserving/backfilling old snapshots through the new migration, no Alembic schema drift, true full-text/vector fusion, document isolation, overview coverage, real local models, quote validation, corrective retry, wire-level JSON schema serialization, saved-session restarts, atomic failure handling, stale-session protection, worker cancellation/output isolation, and Textual keyboard/picker behavior. Live ChatGPT account authorization and generation are separate from mocked transport verification.

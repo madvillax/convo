@@ -52,8 +52,7 @@ class DocumentIndex:
             ) from error
         except SQLAlchemyError as error:
             raise BackendNotConnected(
-                "The RAG database is not ready. From the project directory run "
-                "`uv run --extra backend alembic upgrade head`, then select the file again."
+                "The RAG database is not ready. Run `convo --setup`, then select the file again."
             ) from error
 
     def _prepare(self, path: Path) -> Document:

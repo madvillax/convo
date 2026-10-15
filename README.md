@@ -9,14 +9,15 @@ It is released under the [MIT License](LICENSE). Contributions are welcome—see
 The supported release install uses [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv tool install "convo-rag[backend]"
-convo --setup
+uv tool install convo-cli
 convo
 ```
 
-`convo --setup` creates a private settings file at `~/.config/convo/.env`, pulls `pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations. It generates a random database password; it does not replace or reset any existing data.
+On first launch, `convo` creates a private settings file at `~/.config/convo/.env`, pulls `pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations before opening the terminal app. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
 
-The setup command needs Docker Desktop or Podman. On macOS, it starts or initializes a Podman machine when Podman is installed. If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL before setup; Convo will migrate that database and will not create a local container.
+Local storage needs Docker Desktop or Podman installed. Start Docker Desktop first if you use Docker. On macOS, Convo starts or initializes a Podman machine when Podman is installed. First use downloads Python dependencies, a database image, and—when indexing your first file—the embedding/reranker models.
+
+If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL, run `convo --setup` once to migrate that database, then run `convo`. Explicit database connections are used as configured; startup only manages storage created by Convo.
 
 For a one-command install on macOS/Linux, inspect and then run the repository installer:
 
@@ -24,14 +25,13 @@ For a one-command install on macOS/Linux, inspect and then run the repository in
 curl -LsSf https://raw.githubusercontent.com/madvillax/convo/main/scripts/install.sh | sh
 ```
 
-It installs uv if needed, installs `convo-rag[backend]`, adds uv's tool directory to your shell path, and runs `convo --setup`. Open a new terminal if `convo` is not immediately found.
+It installs uv if needed, installs `convo-cli`, and adds uv's tool directory to your shell path. Then type `convo` to start. Open a new terminal if `convo` is not immediately found.
 
 To use an unreleased checkout while developing:
 
 ```sh
-uv sync --python 3.12 --extra backend
-uv run --extra backend convo --setup
-uv run --extra backend convo
+uv sync --python 3.12
+uv run convo
 ```
 
 `--directory ~/Documents` changes the file browser root. Environment variables always override the user settings file; `.env.example` is only for checkout-based development.
@@ -39,10 +39,10 @@ uv run --extra backend convo
 Optional model download/warmup outside the TUI:
 
 ```sh
-uv run --extra backend convo --download-model
+uv run convo --download-model
 ```
 
-This prepares both Qwen3 and `cross-encoder/ms-marco-MiniLM-L6-v2`. Models otherwise load/download on demand in an isolated process. File preparation shows stages and elapsed time; Esc cancels it. Download/native logs stay in `~/.cache/convo/rag-worker.log` (respecting `XDG_CACHE_HOME`). Startup restores account preferences locally without connecting to storage, loading models, or fetching the account catalog.
+This prepares both Qwen3 and `cross-encoder/ms-marco-MiniLM-L6-v2`. Models otherwise load/download on demand in an isolated process. File preparation shows stages and elapsed time; Esc cancels it. Download/native logs stay in `~/.cache/convo/rag-worker.log` (respecting `XDG_CACHE_HOME`). After storage preparation, startup restores account preferences locally; models and the account catalog load when needed.
 
 For a UI preview without services or backend dependencies:
 
@@ -102,10 +102,10 @@ convo/
 ## Checks
 
 ```sh
-uv run --extra backend ruff format --check .
-uv run --extra backend ruff check .
-uv run --extra backend ty check
-uv run --extra backend pytest -q
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest -q
 ```
 
 PostgreSQL integration checks use a disposable database, enabled explicitly with `CONVO_TEST_DATABASE_URL`. `CONVO_TEST_MODELS=1` also exercises real Qwen/reranking models. See [ARCHITECTURE.md](ARCHITECTURE.md) for these opt-in checks and their prerequisites.

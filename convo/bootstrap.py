@@ -1,8 +1,7 @@
-"""Create Convo's opt-in local pgvector storage without shelling out through a shell.
+"""Prepare local pgvector storage on startup and keep migrations available in wheels.
 
-The normal application never creates containers.  This module runs only for the
-explicit ``convo --setup`` command (or the separately invoked install script).
-It uses a named volume and binds PostgreSQL to loopback only.
+Convo manages only its labelled container and named volume. Explicit DATABASE_URL
+connections are left alone at startup; ``convo --setup`` migrates them on request.
 """
 
 from __future__ import annotations
@@ -40,12 +39,19 @@ def _run(command: list[str], *, allow_failure: bool = False) -> subprocess.Compl
 
 
 def _container_runtime() -> str:
+    installed = []
     for candidate in ("docker", "podman"):
         if shutil.which(candidate):
-            return candidate
+            installed.append(candidate)
+            if _run([candidate, "info"], allow_failure=True).returncode == 0:
+                return candidate
+    if installed:
+        if "podman" in installed and sys.platform == "darwin":
+            return "podman"
+        return installed[0]
     raise SetupError(
         "Convo needs Docker Desktop or Podman to create its local PostgreSQL storage. "
-        "Install one, start it, then run `convo --setup` again."
+        "Install one, start it, then run `convo` again."
     )
 
 
@@ -69,41 +75,90 @@ def _write_local_settings(database_url: str) -> Path:
     from convo.core.config import user_settings_path
 
     target = user_settings_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    contents = (
         "# Created by `convo --setup`. Keep this file private.\n"
         f"DATABASE_URL={database_url}\n"
         "CONVO_LOCAL_CONTAINER=1\n"
         "EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B\n"
         "RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L6-v2\n"
         "RERANK_MIN_SCORE=-3\n"
-        "RETRIEVAL_CANDIDATES=20\n",
-        encoding="utf-8",
+        "RETRIEVAL_CANDIDATES=20\n"
     )
-    target.chmod(0o600)
+    try:
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as error:
+        raise SetupError(
+            f"Settings already exist at {target}. Configure DATABASE_URL there."
+        ) from error
+    with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+        output.write(contents)
     return target
 
 
 def _configured_database_url() -> str | None:
-    from convo.core.config import load_settings
+    from convo.core.config import load_environment, load_settings
 
-    try:
-        return load_settings().database_url
-    except ValueError:
+    load_environment()
+    if not os.getenv("DATABASE_URL"):
         return None
+    # Invalid supplied settings must be reported, never replaced by a new database.
+    return load_settings().database_url
+
+
+def _is_managed_database(database_url: str | None) -> bool:
+    from dotenv import dotenv_values
+
+    from convo.core.config import user_settings_path
+
+    saved = dotenv_values(user_settings_path())
+    return bool(
+        database_url
+        and saved.get("CONVO_LOCAL_CONTAINER") == "1"
+        and saved.get("DATABASE_URL") == database_url
+    )
 
 
 def _ensure_container(runtime: str, database_url: str | None) -> str:
+    from convo.core.config import user_settings_path
+
     existing = _run([runtime, "container", "inspect", CONTAINER_NAME], allow_failure=True)
     if existing.returncode == 0:
-        _run([runtime, "start", CONTAINER_NAME], allow_failure=True)
         if database_url is None:
             raise SetupError(
                 f"{CONTAINER_NAME!r} already exists, but Convo has no saved database URL. "
                 "Set DATABASE_URL yourself or remove that unused container manually before retrying."
             )
+        label = _run(
+            [
+                runtime,
+                "inspect",
+                "--format",
+                '{{index .Config.Labels "io.convo.managed"}}',
+                CONTAINER_NAME,
+            ]
+        )
+        if label.stdout.strip() != "true":
+            raise SetupError(
+                f"{CONTAINER_NAME!r} belongs to another setup. Set DATABASE_URL to use it explicitly."
+            )
+        _run([runtime, "start", CONTAINER_NAME])
         return database_url
 
+    if database_url is not None:
+        raise SetupError(
+            f"Saved local storage exists but {CONTAINER_NAME!r} is missing. "
+            f"Restore the container using the saved credentials and volume {VOLUME_NAME!r}."
+        )
+    if _run([runtime, "volume", "inspect", VOLUME_NAME], allow_failure=True).returncode == 0:
+        raise SetupError(
+            f"Volume {VOLUME_NAME!r} already exists without saved credentials. "
+            "Restore its connection settings before starting Convo."
+        )
+    if user_settings_path().exists():
+        raise SetupError(
+            f"Settings already exist at {user_settings_path()}. Configure DATABASE_URL there."
+        )
     password = secrets.token_urlsafe(24)
     database_url = (
         f"postgresql+psycopg://{DATABASE_USER}:{quote(password, safe='')}"
@@ -186,12 +241,13 @@ def _upgrade_database() -> None:
 def setup() -> Path:
     """Provision local storage or migrate an explicitly configured PostgreSQL database."""
     configured_url = _configured_database_url()
-    local_container = os.getenv("CONVO_LOCAL_CONTAINER") == "1"
+    local_container = _is_managed_database(configured_url)
     if configured_url is not None and not local_container:
         # An explicitly supplied DATABASE_URL may point at an existing remote or
         # shared database. Do not create a second local container around it.
         database_url = configured_url
     else:
+        print("Preparing Convo's local storage…", flush=True)
         runtime = _container_runtime()
         _ensure_podman_machine(runtime)
         database_url = _ensure_container(runtime, configured_url)
@@ -201,7 +257,17 @@ def setup() -> Path:
     try:
         _upgrade_database()
     except Exception as error:  # Alembic has several driver-specific exception classes.
-        raise SetupError(f"Database was created but migrations failed: {error}") from error
+        raise SetupError(
+            "Could not prepare the database schema. Check PostgreSQL access and pgvector, "
+            "then retry `convo --setup`."
+        ) from error
     from convo.core.config import user_settings_path
 
     return user_settings_path()
+
+
+def ensure_storage() -> None:
+    """Bootstrap first use and restart managed storage before entering the TUI."""
+    database_url = _configured_database_url()
+    if database_url is None or _is_managed_database(database_url):
+        setup()

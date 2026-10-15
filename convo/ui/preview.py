@@ -16,6 +16,5 @@ class ShellBackend:
         self, document: Document, question: str, history: tuple[Message, ...]
     ) -> Answer:
         raise BackendNotConnected(
-            "Shell preview only. Run Convo normally with `uv sync --extra backend` "
-            "to connect PostgreSQL, local embeddings, and ChatGPT."
+            "Shell preview only. Run `convo` to use local storage, embeddings, and ChatGPT."
         )

@@ -24,12 +24,16 @@ class Settings:
     retrieval_candidates: int = 20
 
 
-def load_settings() -> Settings:
+def load_environment() -> None:
     # Environment variables win. The user file makes an installed tool independent
     # of its read-only site-packages directory; the repository file remains useful
     # for contributors running from a checkout.
     load_dotenv(user_settings_path(), override=False)
     load_dotenv(PROJECT_ROOT / ".env", override=False)
+
+
+def load_settings() -> Settings:
+    load_environment()
     database_url = os.environ.get("DATABASE_URL", "")
     if not database_url.startswith("postgresql+psycopg://"):
         raise ValueError("Set DATABASE_URL to a PostgreSQL/Psycopg URL")

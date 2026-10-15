@@ -112,7 +112,7 @@ def test_llamaindex_reads_only_the_selected_file_and_returns_chunk_values(tmp_pa
 
 @pytest.mark.parametrize(
     ("failure", "instruction"),
-    [(OperationalError, "Podman"), (ProgrammingError, "alembic upgrade head")],
+    [(OperationalError, "Podman"), (ProgrammingError, "convo --setup")],
 )
 async def test_database_is_checked_before_reading_or_loading_qwen(
     tmp_path, monkeypatch, failure, instruction

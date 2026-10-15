@@ -5,16 +5,16 @@ Contributions from students, researchers, and terminal-tool enthusiasts are welc
 ## Before opening a pull request
 
 1. Fork the repository and create a focused branch.
-2. Install the project with `uv sync --python 3.12 --extra backend`.
+2. Install the project with `uv sync --python 3.12`.
 3. Keep changes focused: do not mix formatting, dependency upgrades, and unrelated features.
 4. Add or update tests for changed behaviour.
 5. Run the checks below from the repository root.
 
 ```sh
-uv run --extra backend ruff format --check .
-uv run --extra backend ruff check .
-uv run --extra backend ty check
-uv run --extra backend pytest -q
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest -q
 ```
 
 PostgreSQL and model checks are intentionally opt-in; see `ARCHITECTURE.md` for the required environment variables. Never commit `.env`, tokens, personal documents, model caches, or database dumps.

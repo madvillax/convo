@@ -2,7 +2,7 @@
 # Install Convo from PyPI. Review this script before running it with curl.
 set -eu
 
-PACKAGE="${CONVO_PACKAGE:-convo-rag[backend]}"
+PACKAGE="${CONVO_PACKAGE:-convo-cli}"
 
 if command -v uv >/dev/null 2>&1; then
   UV_BIN="$(command -v uv)"
@@ -19,8 +19,5 @@ fi
 "$UV_BIN" tool install --python 3.12 --force "$PACKAGE"
 "$UV_BIN" tool update-shell
 
-CONVO_BIN_DIR="$("$UV_BIN" tool dir --bin)"
-"$CONVO_BIN_DIR/convo" --setup
-
 echo
-echo "Convo is ready. Start it with: convo"
+echo "Convo is installed. Start it with: convo"

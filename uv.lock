@@ -576,15 +576,10 @@ wheels = [
 ]
 
 [[package]]
-name = "convo-rag"
+name = "convo-cli"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "textual" },
-]
-
-[package.optional-dependencies]
-backend = [
     { name = "alembic" },
     { name = "docx2txt" },
     { name = "httpx" },
@@ -601,6 +596,7 @@ backend = [
     { name = "python-dotenv" },
     { name = "sentence-transformers" },
     { name = "sqlalchemy" },
+    { name = "textual" },
     { name = "transformers" },
 ]
 
@@ -614,25 +610,24 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", marker = "extra == 'backend'", specifier = ">=1.20.0" },
-    { name = "docx2txt", marker = "extra == 'backend'", specifier = ">=0.9" },
-    { name = "httpx", marker = "extra == 'backend'", specifier = ">=0.28.1" },
-    { name = "keyring", marker = "extra == 'backend'", specifier = ">=25.6" },
-    { name = "llama-index-core", marker = "extra == 'backend'", specifier = ">=0.14.25" },
-    { name = "llama-index-readers-file", marker = "extra == 'backend'", specifier = ">=0.7.0" },
-    { name = "numpy", marker = "extra == 'backend'", specifier = ">=2.4.6" },
-    { name = "openai", marker = "extra == 'backend'", specifier = ">=2.0" },
-    { name = "pgvector", marker = "extra == 'backend'", specifier = ">=0.5.1" },
-    { name = "psycopg", extras = ["binary"], marker = "extra == 'backend'", specifier = ">=3" },
-    { name = "pydantic", marker = "extra == 'backend'", specifier = ">=2.0,<3" },
-    { name = "pyjwt", extras = ["crypto"], marker = "extra == 'backend'", specifier = ">=2.10" },
-    { name = "python-dotenv", marker = "extra == 'backend'", specifier = ">=1.2.4" },
-    { name = "sentence-transformers", marker = "extra == 'backend'", specifier = ">=6.1.0" },
-    { name = "sqlalchemy", marker = "extra == 'backend'", specifier = ">=2.0,<3" },
+    { name = "alembic", specifier = ">=1.20.0" },
+    { name = "docx2txt", specifier = ">=0.9" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "keyring", specifier = ">=25.6" },
+    { name = "llama-index-core", specifier = ">=0.14.25" },
+    { name = "llama-index-readers-file", specifier = ">=0.7.0" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "openai", specifier = ">=2.0" },
+    { name = "pgvector", specifier = ">=0.5.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3" },
+    { name = "pydantic", specifier = ">=2.0,<3" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
+    { name = "sentence-transformers", specifier = ">=6.1.0" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
     { name = "textual", specifier = ">=8.2,<9" },
-    { name = "transformers", marker = "extra == 'backend'", specifier = ">=4.51" },
+    { name = "transformers", specifier = ">=4.51" },
 ]
-provides-extras = ["backend"]
 
 [package.metadata.requires-dev]
 dev = [

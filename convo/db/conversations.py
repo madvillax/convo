@@ -50,8 +50,8 @@ class Conversations:
                 yield session
         except SQLAlchemyError as error:
             raise BackendNotConnected(
-                "Could not access saved conversations. Check PostgreSQL/Podman and run "
-                "`uv run --extra backend alembic upgrade head` from the project directory."
+                "Could not access saved conversations. Check PostgreSQL/Docker/Podman "
+                "and run `convo --setup`."
             ) from error
 
     def create(self, document: Document | None = None) -> SessionSnapshot:

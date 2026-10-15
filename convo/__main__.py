@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 from convo.ui.app import ConvoApp
@@ -49,8 +50,7 @@ def main() -> None:
     except ImportError as error:
         parser.error(
             f"Backend dependency {error.name} is missing. Install the published command with "
-            "`uv tool install --force 'convo-rag[backend]'`; from a checkout run "
-            "`uv run --extra backend convo`."
+            "`uv tool install --force convo-cli`; from a checkout run `uv run convo`."
         )
 
     if args.setup:
@@ -58,20 +58,24 @@ def main() -> None:
 
         try:
             settings_path = setup()
-        except SetupError as error:
+        except (SetupError, ValueError) as error:
             parser.error(str(error))
         print(f"Convo storage is ready. Settings are in {settings_path}. Run `convo` to start.")
         return
 
-    try:
-        settings = load_settings()
-    except ValueError as error:
-        parser.error(str(error))
     if args.download_model:
+        # Warming models does not require a running database or a container runtime.
+        from convo.core.config import Settings, load_environment
         from convo.core.contracts import Hit
         from convo.pipeline.embeddings import Embedder
         from convo.pipeline.reranking import Reranker
 
+        load_environment()
+        settings = Settings(
+            "",
+            os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B"),
+            reranker_model=os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L6-v2"),
+        )
         print(
             "Downloading/loading Qwen3 embeddings. First use can take several minutes.", flush=True
         )
@@ -82,6 +86,14 @@ def main() -> None:
         )
         print("Both models are ready. Run convo and choose a file with /file.")
         return
+
+    from convo.bootstrap import SetupError, ensure_storage
+
+    try:
+        ensure_storage()
+        settings = load_settings()
+    except (SetupError, ValueError) as error:
+        parser.error(str(error))
 
     backend = RagBackend(settings)
     try:
