@@ -15,6 +15,7 @@ COMMANDS = (
     Command("/file", "Choose a file to chat with"),
     Command("/login", "Connect your ChatGPT account"),
     Command("/models", "Choose an account model"),
+    Command("/thinking", "Choose the model's thinking effort"),
     Command("/sessions", "Resume a saved conversation"),
     Command("/new", "Start a new chat with this file"),
     Command("/clear", "Start fresh, keep your file"),

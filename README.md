@@ -51,7 +51,9 @@ Type `/` for command suggestions. Filter by typing, use ↑/↓ to move, Tab to 
 | `/login` | Connect your ChatGPT account through browser sign-in |
 | `/models` | Search and select an account model |
 | `/models <id>` | Select a model directly |
-| Shift+Tab | Cycle auto and the model's known thinking levels |
+| Ctrl+T or Shift+Tab | Cycle auto and the model's supported thinking levels |
+| F2 or `/thinking` | Choose a thinking level directly |
+| `/thinking high`, `/thinking auto` | Set a supported level or restore the model default |
 | `/file`, Ctrl+O | Select and index a file; create a saved conversation |
 | `/sessions` | Search saved conversations by title, filename, or ID and resume one |
 | `/sessions <uuid>` | Resume a conversation directly |
@@ -61,6 +63,11 @@ Type `/` for command suggestions. Filter by typing, use ↑/↓ to move, Tab to 
 | Esc during file preparation | Stop preparation and restore the input |
 | `/help` | Show commands and keys |
 | `/quit`, `/exit`, Ctrl+C | Exit |
+| PageUp / PageDown | Scroll the transcript while keeping the input focused |
+
+Questions appear in shaded blocks with a gold left edge. Answers use spaced Markdown with highlighted code, and source quotations appear in a separate subdued block. The composer groups your input with the gold model name and thinking level underneath. The ASCII title collapses once chatting starts and in smaller terminals, leaving more room to read. Long replies open at the question and the beginning of the answer; use PageUp/PageDown or the mouse wheel to keep reading.
+
+Change the cycling shortcut with `convo --thinking-key ctrl+g` or set `CONVO_THINKING_KEY=ctrl+g` in `.env` (export it for `--shell`). The command-line flag takes precedence. Shift+Tab and F2 remain available. Choose a Ctrl/Alt letter or F3–F24; essential keys are reserved. `/help` shows the configured shortcut. Only thinking levels supported by the selected account model can be saved.
 
 Sessions, completed message pairs, displayed source quotes, and structured answers persist in PostgreSQL. Use `/sessions` after restarting. Resuming uses the saved indexed snapshot, so the original file can have moved or disappeared. Use `/file` again to index changed content. A failed request never saves a partial turn. Account tokens remain in the OS keyring; model/thinking preferences remain in the local account profile.
 

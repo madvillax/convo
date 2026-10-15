@@ -4,11 +4,18 @@ from pathlib import Path
 
 from convo.ui.app import ConvoApp
 from convo.ui.preview import ShellBackend
+from convo.ui.thinking import thinking_key
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Chat with a file in your current directory.")
     parser.add_argument("--directory", type=Path, default=None, help="Browse this folder instead")
+    parser.add_argument(
+        "--thinking-key",
+        type=thinking_key,
+        default=None,
+        help="Thinking cycle shortcut (default: CONVO_THINKING_KEY or ctrl+t)",
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--shell",
@@ -25,7 +32,11 @@ def main() -> None:
     if not directory.is_dir():
         parser.error(f"Not a directory: {directory}")
     if args.shell:
-        ConvoApp(directory=directory, backend=ShellBackend()).run()
+        try:
+            app = ConvoApp(directory, ShellBackend(), thinking_shortcut=args.thinking_key)
+        except ValueError as error:
+            parser.error(str(error))
+        app.run()
         return
 
     try:
@@ -61,7 +72,11 @@ def main() -> None:
 
     backend = RagBackend(settings)
     try:
-        ConvoApp(directory=directory, backend=backend).run()
+        try:
+            app = ConvoApp(directory, backend, thinking_shortcut=args.thinking_key)
+        except ValueError as error:
+            parser.error(str(error))
+        app.run()
     finally:
         backend.close()
 
