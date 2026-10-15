@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c0c0c" />
+    <meta
+      name="description"
+      content="Chat with your files, right from your terminal. Install Convo, open a directory, and get answers with supporting source quotations."
+    />
+    <title>Convo / Your files. A conversation.</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="page-shell">
+      <header class="site-header">
+        <a href="#" class="wordmark" aria-label="Convo home"
+          ><span class="brand-mark" aria-hidden="true"></span>convo<span
+            class="cursor"
+            aria-hidden="true"
+            >_</span
+          ></a
+        >
+        <nav aria-label="Main navigation">
+          <a href="#how-to-use">How to use</a>
+          <a
+            class="github-link"
+            href="https://github.com/madvillax/convo"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub <span aria-hidden="true">↗</span></a
+          >
+          <a class="nav-install" href="#install">Install <span aria-hidden="true">↓</span></a>
+        </nav>
+      </header>
+
+      <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-intro">
+            <p class="eyebrow">
+              <span aria-hidden="true">[</span> OPEN SOURCE. TERMINAL NATIVE.
+              <span aria-hidden="true">]</span>
+            </p>
+            <h1 id="hero-title">Your files.<br /><span>A conversation.</span></h1>
+            <p class="hero-description">
+              Ask your files anything. Get answers with sources.<br class="desktop-break" />
+              All from the terminal you already call home.
+            </p>
+            <div class="installation" id="install">
+              <div class="install-tabs" role="tablist" aria-label="Installation method">
+                <button
+                  id="tab-uv"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="install-panel"
+                  data-method="uv"
+                  type="button"
+                >
+                  uv
+                </button>
+                <button
+                  id="tab-curl"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="install-panel"
+                  tabindex="-1"
+                  data-method="curl"
+                  type="button"
+                >
+                  curl
+                </button>
+                <span class="install-platform">macOS / Linux</span>
+              </div>
+              <div
+                class="install-command"
+                id="install-panel"
+                role="tabpanel"
+                aria-labelledby="tab-uv"
+                tabindex="0"
+              >
+                <span class="prompt" aria-hidden="true">$</span>
+                <code id="install-code">uv tool install convo-cli</code>
+                <button
+                  class="copy-button"
+                  id="copy-install"
+                  type="button"
+                  aria-label="Copy installation command"
+                >
+                  <span class="copy-icon" aria-hidden="true"></span
+                  ><span class="copy-label">Copy</span>
+                </button>
+              </div>
+              <p class="install-note" id="install-note">
+                Requires
+                <a
+                  href="https://docs.astral.sh/uv/getting-started/installation/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >uv ↗</a
+                >
+                and Docker or Podman for local storage.
+              </p>
+            </div>
+          </div>
+
+          <figure class="product-preview">
+            <div class="preview-header">
+              <span
+                ><span class="terminal-symbol" aria-hidden="true">&gt;_</span> A little less
+                searching. A little more knowing.</span
+              ><span class="preview-tag">convo</span>
+            </div>
+            <div class="screenshot-crop">
+              <img
+                src="/images/convo-chat.png"
+                alt="Convo terminal showing a question about a RAG pipeline, an answer with code, and a supporting source quotation from architecture.md."
+                width="1400"
+                height="1400"
+                fetchpriority="high"
+              />
+            </div>
+            <figcaption>
+              <span>One file. Real context. Cited answers.</span
+              ><a href="#how-to-use">Make yourself at home <span aria-hidden="true">↓</span></a>
+            </figcaption>
+          </figure>
+        </section>
+
+        <section class="usage" id="how-to-use" aria-labelledby="usage-title">
+          <div class="usage-heading">
+            <h2 id="usage-title">From directory to dialogue<span>.</span></h2>
+            <p>Open your terminal. Bring a file. Start a convo.</p>
+          </div>
+          <div class="usage-layout">
+            <ol class="steps">
+              <li>
+                <span class="step-number" aria-hidden="true">01</span>
+                <div>
+                  <h3>Meet Convo in your directory</h3>
+                  <p>Move into the folder with your files, then launch Convo.</p>
+                  <div class="code-block">
+                    <code
+                      ><span class="prompt">$</span> cd ~/Documents<br /><span class="prompt"
+                        >$</span
+                      >
+                      convo</code
+                    ><button
+                      class="copy-button compact"
+                      data-copy="cd ~/Documents\nconvo"
+                      type="button"
+                      aria-label="Copy launch commands"
+                    >
+                      <span class="copy-icon" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <p class="step-note">
+                    Or browse another folder with <code>convo --directory ~/Documents</code>. First
+                    launch prepares your local database.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span class="step-number" aria-hidden="true">02</span>
+                <div>
+                  <h3>Connect. Pick a file.</h3>
+                  <p>
+                    Use <code>/login</code> to connect your ChatGPT account in the browser. Then use
+                    <code>/file</code> to select and index a file.
+                  </p>
+                  <div class="inline-commands">
+                    <code>/login</code><span aria-hidden="true">→</span><code>/models</code
+                    ><span aria-hidden="true">→</span><code>/file</code>
+                  </div>
+                  <p class="step-note">
+                    Choose your model with <code>/models</code>. The first file downloads the local
+                    embedding and reranking models.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span class="step-number" aria-hidden="true">03</span>
+                <div>
+                  <h3>Ask away. Follow the sources.</h3>
+                  <p>
+                    Type a question and press Enter. Read the answer alongside quotations from your
+                    selected file.
+                  </p>
+                  <div class="example-question">
+                    <span aria-hidden="true">›</span> What are the key ideas in this document?
+                  </div>
+                  <p class="step-note">
+                    Conversations save automatically. Pick up where you left off with
+                    <code>/sessions</code>.
+                  </p>
+                </div>
+              </li>
+            </ol>
+
+            <aside class="command-reference" aria-label="Convo command reference">
+              <div class="reference-heading">
+                <h3>A few commands.<br />A lot less friction.</h3>
+                <p>Type <code>/</code> in Convo to see suggestions.</p>
+              </div>
+              <div class="reference-tabs" role="tablist" aria-label="Command category">
+                <button
+                  id="tab-everyday"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="commands-everyday"
+                  data-category="everyday"
+                  type="button"
+                >
+                  Everyday</button
+                ><button
+                  id="tab-session"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="commands-session"
+                  tabindex="-1"
+                  data-category="session"
+                  type="button"
+                >
+                  Sessions</button
+                ><button
+                  id="tab-terminal"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="commands-terminal"
+                  tabindex="-1"
+                  data-category="terminal"
+                  type="button"
+                >
+                  Terminal
+                </button>
+              </div>
+              <dl
+                id="commands-everyday"
+                class="command-list"
+                role="tabpanel"
+                aria-labelledby="tab-everyday"
+                tabindex="0"
+              >
+                <div>
+                  <dt>/login</dt>
+                  <dd>Connect your ChatGPT account</dd>
+                </div>
+                <div>
+                  <dt>/file</dt>
+                  <dd>Choose and index a file</dd>
+                </div>
+                <div>
+                  <dt>/models</dt>
+                  <dd>Search and choose a model</dd>
+                </div>
+                <div>
+                  <dt>/thinking</dt>
+                  <dd>Choose the thinking effort</dd>
+                </div>
+                <div>
+                  <dt>/help</dt>
+                  <dd>See all commands and keys</dd>
+                </div>
+                <div>
+                  <dt>/quit</dt>
+                  <dd>Close Convo</dd>
+                </div>
+              </dl>
+              <dl
+                id="commands-session"
+                class="command-list"
+                role="tabpanel"
+                aria-labelledby="tab-session"
+                tabindex="0"
+                hidden
+              >
+                <div>
+                  <dt>/sessions</dt>
+                  <dd>Find and resume saved chats</dd>
+                </div>
+                <div>
+                  <dt>/new</dt>
+                  <dd>New chat, same selected file</dd>
+                </div>
+                <div>
+                  <dt>/clear</dt>
+                  <dd>Same as /new; keeps old chats</dd>
+                </div>
+                <div>
+                  <dt>/reset</dt>
+                  <dd>New chat without a file</dd>
+                </div>
+                <div>
+                  <dt>/sessions &lt;uuid&gt;</dt>
+                  <dd>Resume a chat directly by ID</dd>
+                </div>
+              </dl>
+              <dl
+                id="commands-terminal"
+                class="command-list"
+                role="tabpanel"
+                aria-labelledby="tab-terminal"
+                tabindex="0"
+                hidden
+              >
+                <div>
+                  <dt>Ctrl+O</dt>
+                  <dd>Open the file picker</dd>
+                </div>
+                <div>
+                  <dt>Ctrl+T / Shift+Tab</dt>
+                  <dd>Cycle supported thinking levels</dd>
+                </div>
+                <div>
+                  <dt>F2</dt>
+                  <dd>Pick a thinking level directly</dd>
+                </div>
+                <div>
+                  <dt>PageUp / PageDown</dt>
+                  <dd>Scroll the conversation</dd>
+                </div>
+                <div>
+                  <dt>Esc</dt>
+                  <dd>Cancel file preparation</dd>
+                </div>
+                <div>
+                  <dt>Ctrl+C</dt>
+                  <dd>Exit Convo</dd>
+                </div>
+              </dl>
+              <p class="reference-tip">
+                <span aria-hidden="true">↳</span> In the command menu: <kbd>↑</kbd> <kbd>↓</kbd> to
+                navigate, <kbd>Tab</kbd> to complete.
+              </p>
+              <details class="file-types">
+                <summary>What files can I bring? <span aria-hidden="true">+</span></summary>
+                <p>
+                  TXT, Markdown, PDF, DOCX, CSV, JSON, Python, RST, and log files. Up to 10 MB per
+                  file, with a limit of 500,000 extracted characters and 2,000 chunks.
+                </p>
+                <p>
+                  Files are indexed locally. Relevant passages go to your connected ChatGPT account
+                  to generate an answer.
+                </p>
+              </details>
+            </aside>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <a href="#" class="wordmark" aria-label="Convo home"
+          >convo<span class="cursor" aria-hidden="true">_</span></a
+        >
+        <p>Good questions start here.</p>
+        <a
+          href="https://github.com/madvillax/convo/blob/main/LICENSE"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Open source. MIT licensed. <span aria-hidden="true">↗</span></a
+        >
+      </footer>
+    </div>
+    <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+  </body>
+</html>

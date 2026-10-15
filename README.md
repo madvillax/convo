@@ -6,7 +6,7 @@ It is released under the [MIT License](LICENSE). Contributions are welcome—see
 
 ## Install and start
 
-The supported release install uses [uv](https://docs.astral.sh/uv/):
+The supported release install uses [uv](https://docs.astral.sh/uv/):c
 
 ```sh
 uv tool install convo-cli
@@ -98,6 +98,17 @@ convo/
 ```
 
 [ARCHITECTURE.md](ARCHITECTURE.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
+
+## Website workspace
+
+This repository also contains the landing page in [`apps/web`](apps/web/README.md). The Python CLI stays in `convo/`; the website uses a separate Bun workspace.
+
+```sh
+bun install
+bun run dev     # website at http://127.0.0.1:3000
+bun run build   # static output in apps/web/dist
+bun run check   # website checks
+```
 
 ## Checks
 

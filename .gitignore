@@ -7,3 +7,6 @@ __pycache__/
 dist/
 *.egg-info/
 screenshots/
+node_modules/
+.vite/
+.vite-plus/
