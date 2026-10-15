@@ -1,5 +1,4 @@
 import argparse
-import shlex
 from pathlib import Path
 
 from convo.ui.app import ConvoApp
@@ -20,6 +19,11 @@ def main() -> None:
         action="store_true",
         help="Download and warm Qwen3 and the reranker outside the TUI, then exit",
     )
+    mode.add_argument(
+        "--setup",
+        action="store_true",
+        help="Create and migrate Convo's local PostgreSQL/pgvector storage, then exit",
+    )
     args = parser.parse_args()
     directory = (args.directory or Path.cwd()).expanduser().resolve()
     if not directory.is_dir():
@@ -32,12 +36,21 @@ def main() -> None:
         from convo.core.config import load_settings
         from convo.pipeline.chat import RagBackend
     except ImportError as error:
-        requirement = shlex.quote(f"{Path(__file__).resolve().parents[1]}[backend]")
         parser.error(
-            f"Backend dependency {error.name} is missing. From the checkout run "
-            "`uv run --extra backend convo`, or update the installed command with "
-            f"`uv tool install --force --editable {requirement}`."
+            f"Backend dependency {error.name} is missing. Install the published command with "
+            "`uv tool install --force 'convo-rag[backend]'`; from a checkout run "
+            "`uv run --extra backend convo`."
         )
+
+    if args.setup:
+        from convo.bootstrap import SetupError, setup
+
+        try:
+            settings_path = setup()
+        except SetupError as error:
+            parser.error(str(error))
+        print(f"Convo storage is ready. Settings are in {settings_path}. Run `convo` to start.")
+        return
 
     try:
         settings = load_settings()

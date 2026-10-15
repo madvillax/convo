@@ -9,6 +9,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 EMBEDDING_DIMENSIONS = 1024
 
 
+def user_settings_path() -> Path:
+    """Return the private per-user settings file used by an installed CLI."""
+    config_home = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return config_home / "convo" / ".env"
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = field(repr=False)
@@ -19,7 +25,10 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    # Independent of the user's document browsing directory; env vars take priority.
+    # Environment variables win. The user file makes an installed tool independent
+    # of its read-only site-packages directory; the repository file remains useful
+    # for contributors running from a checkout.
+    load_dotenv(user_settings_path(), override=False)
     load_dotenv(PROJECT_ROOT / ".env", override=False)
     database_url = os.environ.get("DATABASE_URL", "")
     if not database_url.startswith("postgresql+psycopg://"):

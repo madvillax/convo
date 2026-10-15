@@ -1,32 +1,40 @@
-# convo
+# Convo
 
-A quiet Python terminal app for chatting with a local file. Qwen3 embeddings and PostgreSQL full-text search retrieve passages together; a local cross-encoder reranks them; your connected ChatGPT account returns a structured answer with supporting quotations.
+Convo is an open-source, local-first terminal app for chatting with a selected file. Qwen3 embeddings and PostgreSQL full-text search retrieve passages together; a local cross-encoder reranks them; your connected ChatGPT account returns a structured answer with supporting quotations.
 
-## Run
+It is released under the [MIT License](LICENSE). Contributions are welcome—see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Use Python 3.12 and [uv](https://docs.astral.sh/uv/):
+## Install and start
 
-```sh
-uv sync --python 3.12 --extra backend
-# On first setup: copy .env.example to .env and configure DATABASE_URL.
-# Start your existing Podman machine and PostgreSQL container:
-podman machine start
-podman start convo-postgres
-uv run --extra backend alembic upgrade head
-uv run --extra backend convo
-```
-
-Skip the Podman start commands when the machine/container is already running. See [backend.md](backend.md) for first-time container creation and the architecture guide. The new migration adds full-text indexing and conversation tables; it preserves existing document snapshots and embeddings.
-
-Install/update the command for other directories:
+The supported release install uses [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv tool install --python 3.12 --force --editable '/Users/mohitsharma/Desktop/Projects/convo[backend]'
-cd ~/Documents
+uv tool install "convo-rag[backend]"
+convo --setup
 convo
 ```
 
-`uv sync` updates the project environment, while `uv tool install` updates the installed tool environment. An existing editable installation of this checkout reads source changes automatically. `--directory ~/Documents` changes the file browser root; settings still come from the checkout's `.env` or your environment.
+`convo --setup` creates a private settings file at `~/.config/convo/.env`, pulls `pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations. It generates a random database password; it does not replace or reset any existing data.
+
+The setup command needs Docker Desktop or Podman. On macOS, it starts or initializes a Podman machine when Podman is installed. If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL before setup; Convo will migrate that database and will not create a local container.
+
+For a one-command install on macOS/Linux, inspect and then run the repository installer:
+
+```sh
+curl -LsSf https://raw.githubusercontent.com/madvillax/convo/main/scripts/install.sh | sh
+```
+
+It installs uv if needed, installs `convo-rag[backend]`, adds uv's tool directory to your shell path, and runs `convo --setup`. Open a new terminal if `convo` is not immediately found.
+
+To use an unreleased checkout while developing:
+
+```sh
+uv sync --python 3.12 --extra backend
+uv run --extra backend convo --setup
+uv run --extra backend convo
+```
+
+`--directory ~/Documents` changes the file browser root. Environment variables always override the user settings file; `.env.example` is only for checkout-based development.
 
 Optional model download/warmup outside the TUI:
 
@@ -82,7 +90,7 @@ convo/
 └── db/         SQLAlchemy models, connections, document/search/session queries
 ```
 
-[backend.md](backend.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
+[ARCHITECTURE.md](ARCHITECTURE.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
 
 ## Checks
 
@@ -93,4 +101,13 @@ uv run --extra backend ty check
 uv run --extra backend pytest -q
 ```
 
-PostgreSQL integration checks use a disposable database, enabled explicitly with `CONVO_TEST_DATABASE_URL`. `CONVO_TEST_MODELS=1` also exercises real Qwen/reranking models. See the backend guide for these opt-in checks and their prerequisites.
+PostgreSQL integration checks use a disposable database, enabled explicitly with `CONVO_TEST_DATABASE_URL`. `CONVO_TEST_MODELS=1` also exercises real Qwen/reranking models. See [ARCHITECTURE.md](ARCHITECTURE.md) for these opt-in checks and their prerequisites.
+
+## Releasing to PyPI
+
+Maintainers should test a release on TestPyPI first, then create a GitHub release. The included `Publish to PyPI` workflow uses PyPI Trusted Publishing, so it does not require a long-lived token in the repository. Configure the repository and `.github/workflows/publish.yml` as a Trusted Publisher in PyPI before publishing.
+
+```sh
+uv build --no-sources
+uv publish --token "$PYPI_TOKEN" # one-time/manual alternative
+```

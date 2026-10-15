@@ -5,9 +5,30 @@ build-backend = "hatchling.build"
 [project]
 name = "convo-rag"
 version = "0.1.0"
-description = "A quiet Python terminal interface for chatting with a file."
+description = "A local terminal RAG assistant for chatting with selected files."
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mohit Sharma" }]
+keywords = ["cli", "rag", "terminal", "textual", "local-first"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: General",
+]
 dependencies = ["textual>=8.2,<9"]
+
+[project.urls]
+Homepage = "https://github.com/madvillax/convo"
+Repository = "https://github.com/madvillax/convo"
+Issues = "https://github.com/madvillax/convo/issues"
 
 [project.scripts]
 convo = "convo.__main__:main"
@@ -34,6 +55,21 @@ backend = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["convo"]
+force-include = { "migrations" = "convo/migrations" }
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "convo",
+    "migrations",
+    "tests",
+    "scripts",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "pyproject.toml",
+    "alembic.ini",
+]
 
 [dependency-groups]
 dev = [

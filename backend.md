@@ -72,14 +72,17 @@ The main abstractions are `Backend` for the UI, optional account/model/session c
 
 **Checkpoint:** follow one request from `ui/app.py` to `pipeline/chat.py`; it delegates to the worker, provider, and conversation store.
 
-## 2. Install with uv and start PostgreSQL through Podman
+## 2. Install with uv and create local PostgreSQL storage
 
 ```sh
 uv sync --python 3.12 --extra backend
-podman machine list
+uv run --extra backend convo --setup
+uv run --extra backend convo
 ```
 
-On macOS, initialize a Podman machine only if none exists. Start an existing stopped machine with `podman machine start`. Create the project's database container once:
+`convo --setup` is the supported first-run path for an installed CLI as well. It detects Docker or Podman, starts/initializes a Podman machine on macOS when needed, creates a named `convo-postgres-data` volume, and binds the `convo-postgres` pgvector container only to `127.0.0.1:5432`. It generates a database password and writes the connection string with mode `0600` to `~/.config/convo/.env` (or `$XDG_CONFIG_HOME/convo/.env`). It never deletes, replaces, or resets an existing container or volume.
+
+For a development-only manual setup, create the project's database container once:
 
 ```sh
 podman run --name convo-postgres \
@@ -91,7 +94,7 @@ podman run --name convo-postgres \
   -d pgvector/pgvector:pg16
 ```
 
-For later runs, use `podman start convo-postgres`. The named volume preserves the database across container stops. The example credentials are for local development; set your own values consistently if changed.
+For later runs, use `podman start convo-postgres`. The named volume preserves the database across container stops. The example credentials are for local development; set your own values consistently if changed. An installed CLI should use `convo --setup` instead, so it can keep a random password in its private user settings file.
 
 Configure the project `.env` from `.env.example`:
 
