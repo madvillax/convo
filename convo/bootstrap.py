@@ -18,7 +18,9 @@ from urllib.parse import quote
 
 CONTAINER_NAME = "convo-postgres"
 VOLUME_NAME = "convo-postgres-data"
-IMAGE = "pgvector/pgvector:pg16"
+# Podman (including Fedora's docker shim) cannot prompt for a registry when
+# startup captures subprocess output. Always use a fully qualified image name.
+IMAGE = "docker.io/pgvector/pgvector:pg16"
 DATABASE_NAME = "convo"
 DATABASE_USER = "convo"
 
