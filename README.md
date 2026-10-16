@@ -1,4 +1,8 @@
-# Convo
+<div align="center">
+  <img src="apps/web/public/favicon.svg" alt="Convo logo" width="64" height="64" />
+  <h1>Convo</h1>
+  <p><strong>Your files. A quiet conversation.</strong></p>
+</div>
 
 Convo is an open-source, local-first terminal app for chatting with a selected file. Qwen3 embeddings and PostgreSQL full-text search retrieve passages together; a local cross-encoder reranks them; your connected ChatGPT account returns a structured answer with supporting quotations.
 
@@ -6,30 +10,21 @@ It is released under the [MIT License](LICENSE). Contributions are welcome—see
 
 ## Install and start
 
-The supported release install uses [uv](https://docs.astral.sh/uv/):c
+Install the current version from GitHub with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv tool install convo-cli
-convo
+uv tool install --python 3.12 'git+https://github.com/madvillax/convo.git'
 ```
 
-On first launch, `convo` creates a private settings file at `~/.config/convo/.env`, pulls `docker.io/pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations before opening the terminal app. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
+Convo needs Docker Desktop or Podman for its local database. The install downloads its Python dependencies. On first launch, it creates a private settings file at `~/.config/convo/.env`, pulls `docker.io/pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
 
-Local storage needs Docker Desktop or Podman installed. Start Docker Desktop first if you use Docker. On macOS, Convo starts or initializes a Podman machine when Podman is installed. First use downloads Python dependencies, a database image, and—when indexing your first file—the embedding/reranker models.
+On macOS, Convo starts or initializes a Podman machine when Podman is installed. First use downloads a database image and, when indexing your first file, the embedding and reranker models.
 
 Older Convo versions may fail on Fedora/Podman with `short-name resolution enforced but cannot prompt without a TTY`. Run `podman pull pgvector/pgvector:pg16` directly in an interactive terminal, select `docker.io/pgvector/pgvector:pg16` if prompted, then retry `convo`. Podman saves that registry choice for later launches. Current source uses the full Docker Hub image name to avoid the prompt, including when the `docker` command is a Podman compatibility wrapper.
 
 If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL, run `convo --setup` once to migrate that database, then run `convo`. Explicit database connections are used as configured; startup only manages storage created by Convo.
 
-For a one-command install on macOS/Linux, inspect and then run the repository installer:
-
-```sh
-curl -LsSf https://raw.githubusercontent.com/madvillax/convo/main/scripts/install.sh | sh
-```
-
-It installs uv if needed, installs `convo-cli`, and adds uv's tool directory to your shell path. Then type `convo` to start. Open a new terminal if `convo` is not immediately found.
-
-To use an unreleased checkout while developing:
+To install from a local checkout while developing, run this from the repository root:
 
 ```sh
 uv sync --python 3.12
@@ -52,9 +47,44 @@ For a UI preview without services or backend dependencies:
 uv run convo --shell
 ```
 
-## Use
+## How to use
 
-Type `/` for command suggestions. Filter by typing, use ↑/↓ to move, Tab to complete, Enter to run, and Esc to dismiss.
+### 1. Open the folder you want to ask about
+
+Run Convo from your project directory. It starts its file browser there.
+
+```sh
+cd ~/path/to/your/project
+convo
+```
+
+To browse another folder, pass it directly: `convo --directory ~/Documents`.
+
+### 2. Connect your ChatGPT account
+
+In Convo, type `/login`, press Enter, and finish sign-in in your browser. Then type `/models` to choose an account model. You can type `/` at any time to see command suggestions; use ↑/↓ to move, Tab to complete, Enter to run, and Esc to close the list.
+
+### 3. Choose a file
+
+Type `/file` and press Enter, or use Ctrl+O. Choose a supported file from the current folder and press Enter. Convo prepares and indexes it before you ask questions.
+
+<p align="center">
+  <img src="docs/images/file-picker.svg" alt="Convo file picker with README.md selected from a sample project folder." width="760" />
+</p>
+
+### 4. Ask a question
+
+Type a question in plain language and press Enter. Convo searches the selected file and answers with numbered citations and a source block showing the file and line numbers.
+
+<p align="center">
+  <img src="apps/web/public/images/convo-chat.png" alt="Example Convo conversation with a cited answer about a project architecture file." width="760" />
+</p>
+
+### 5. Come back to a conversation
+
+Type `/sessions` to search and resume a saved conversation. Type `/new` to start another conversation while keeping the selected file, or `/reset` to start fresh without one.
+
+## Commands and shortcuts
 
 | Command/key | Action |
 | --- | --- |
@@ -101,15 +131,17 @@ convo/
 
 [ARCHITECTURE.md](ARCHITECTURE.md) explains the files, schema, data flow, tuning, and verification. [changes.md](changes.md) records implementation approaches and validation.
 
-## Website workspace
+## Website
 
-This repository also contains the landing page in [`apps/web`](apps/web/README.md). The Python CLI stays in `convo/`; the website uses a separate Bun workspace.
+The Next.js, React, TypeScript, and Tailwind CSS landing page in [`apps/web`](apps/web/README.md) is an independent app with its own package manifest and lockfile.
 
 ```sh
-bun install
-bun run dev     # website at http://127.0.0.1:3000
-bun run build   # static output in apps/web/dist
-bun run check   # website checks
+cd apps/web
+npm install
+npm run dev     # website at http://127.0.0.1:3000
+npm run build   # Next.js production build in .next
+npm run start   # serve the production website
+npm run check   # website checks
 ```
 
 ## Checks
