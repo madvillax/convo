@@ -1,4 +1,6 @@
 node_modules/
+.next/
+out/
 dist/
-.vite/
-.vite-plus/
+*.tsbuildinfo
+.env*.local
