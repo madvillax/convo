@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/web/public/favicon.svg" alt="Convo logo" width="64" height="64" />
+  <img src="https://raw.githubusercontent.com/madvillax/convo/main/apps/web/public/favicon.svg" alt="Convo logo" width="64" height="64" />
   <h1>Convo</h1>
   <p><strong>Your files. A quiet conversation.</strong></p>
 </div>
@@ -10,17 +10,19 @@ It is released under the [MIT License](LICENSE). Contributions are welcome—see
 
 ## Install and start
 
-Install the current version from GitHub with [uv](https://docs.astral.sh/uv/):
+Install Convo from PyPI with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-uv tool install --python 3.12 'git+https://github.com/madvillax/convo.git'
+uv tool install --python 3.12 convo-cli
 ```
+
+To update an existing installation, run `uv tool upgrade --refresh convo-cli`.
 
 Convo needs Docker Desktop or Podman for its local database. The install downloads its Python dependencies. On first launch, it creates a private settings file at `~/.config/convo/.env`, pulls `docker.io/pgvector/pgvector:pg16`, starts a loopback-only `convo-postgres` container, and runs migrations. It generates a random database password and preserves existing data. Later launches restart Convo's local container if needed and apply pending migrations.
 
 On macOS, Convo starts or initializes a Podman machine when Podman is installed. First use downloads a database image and, when indexing your first file, the embedding and reranker models.
 
-Older Convo versions may fail on Fedora/Podman with `short-name resolution enforced but cannot prompt without a TTY`. Run `podman pull pgvector/pgvector:pg16` directly in an interactive terminal, select `docker.io/pgvector/pgvector:pg16` if prompted, then retry `convo`. Podman saves that registry choice for later launches. Current source uses the full Docker Hub image name to avoid the prompt, including when the `docker` command is a Podman compatibility wrapper.
+Convo 0.1.1 fixes Fedora/Podman startup failures reporting `short-name resolution enforced but cannot prompt without a TTY`. Upgrade if you see this error on an older version. Convo now uses the full Docker Hub image name, including when the `docker` command is a Podman compatibility wrapper.
 
 If you already use PostgreSQL, set `DATABASE_URL` to a `postgresql+psycopg://...` URL, run `convo --setup` once to migrate that database, then run `convo`. Explicit database connections are used as configured; startup only manages storage created by Convo.
 
@@ -69,7 +71,7 @@ In Convo, type `/login`, press Enter, and finish sign-in in your browser. Then t
 Type `/file` and press Enter, or use Ctrl+O. Choose a supported file from the current folder and press Enter. Convo prepares and indexes it before you ask questions.
 
 <p align="center">
-  <img src="docs/images/file-picker.svg" alt="Convo file picker with README.md selected from a sample project folder." width="760" />
+  <img src="https://raw.githubusercontent.com/madvillax/convo/main/docs/images/file-picker.svg" alt="Convo file picker with README.md selected from a sample project folder." width="760" />
 </p>
 
 ### 4. Ask a question
@@ -77,7 +79,7 @@ Type `/file` and press Enter, or use Ctrl+O. Choose a supported file from the cu
 Type a question in plain language and press Enter. Convo searches the selected file and answers with numbered citations and a source block showing the file and line numbers.
 
 <p align="center">
-  <img src="apps/web/public/images/convo-chat.png" alt="Example Convo conversation with a cited answer about a project architecture file." width="760" />
+  <img src="https://raw.githubusercontent.com/madvillax/convo/main/apps/web/public/images/convo-chat.png" alt="Example Convo conversation with a cited answer about a project architecture file." width="760" />
 </p>
 
 ### 5. Come back to a conversation

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "convo-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = "A local terminal RAG assistant for chatting with selected files."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -62,6 +62,7 @@ include = [
     "tests",
     "scripts",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
