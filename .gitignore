@@ -10,3 +10,5 @@ screenshots/
 node_modules/
 .vite/
 .vite-plus/
+.next/
+*.tsbuildinfo
